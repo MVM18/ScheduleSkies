@@ -24,8 +24,8 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 30px;
-  position: relative; /* Needed for z-index to work */
-  z-index: 10;        /* Brings the header to the front */
+  position: relative; 
+  z-index: 10;        
 }
 
 .titleGlass {
@@ -65,7 +65,7 @@
   gap: 12px; 
   margin-bottom: 35px; 
   align-items: center; 
-  width: 100%; /* Ensures the bar stretches so buttons can be pushed right */
+  width: 100%; 
 }
 
 .filterBtn {
@@ -80,11 +80,11 @@
 
 .activeFilter { background: #6D7E99 !important; color: white !important; }
 
-/* --- Action Group & Buttons (Add/Edit) --- */
+/* --- Action Group & Buttons --- */
 .actionGroup {
   display: flex;
   gap: 12px;
-  margin-left: auto; /* Pushes the buttons to the far right */
+  margin-left: auto; 
 }
 
 .actionBtn {
@@ -108,6 +108,12 @@
   box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
+.activeEditBtn {
+  background: #2C3E50 !important;
+  color: white !important;
+  border-color: #2C3E50 !important;
+}
+
 /* --- Event Cards --- */
 .eventList { display: flex; flex-direction: column; gap: 20px; }
 .eventCard {
@@ -116,11 +122,9 @@
   display: flex;
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  cursor: pointer;
   transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease; 
 }
 
-/* Hover Effect for Cards */
 .eventCard:hover {
   background-color: #f9f9f9; 
   box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
@@ -148,7 +152,54 @@
 .details h3 { margin: 0 0 6px 0; font-size: 18px; color: #2C3E50; font-weight: 700; }
 .details p { margin: 0; color: #7F8C8D; font-size: 14px; font-weight: 600; }
 
-/* --- EXACT PILL COLORING --- */
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  background: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.iconBtnEdit, .iconBtnDelete {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.iconBtnEdit { color: #4396D1; }
+.iconBtnEdit:hover { background: #4396D1; color: white; }
+
+.iconBtnDelete { color: #FF0000; }
+.iconBtnDelete:hover { background: #FF0000; color: white; }
+
+/* --- Empty State --- */
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 15px;
+  color: #2C3E50;
+  font-weight: 600;
+  border: 2px dashed rgba(255,255,255,0.8);
+}
+
+/* --- Pill Colors --- */
 .tagRow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
 .tag { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
 
@@ -191,15 +242,228 @@
   border-radius: 50%; 
   filter: blur(2px); 
   opacity: 0.8; 
-  z-index: -1; /* Pushes behind the header */
+  z-index: -1; 
 }
 
 .cloud { 
   position: absolute; 
   background: rgba(255, 255, 255, 0.4); 
   border-radius: 100px; 
-  z-index: -1; /* Pushes behind the header */
+  z-index: -1; 
 }
 
 .cloud1 { width: 280px; height: 80px; top: 20px; left: 15%; }
 .cloud2 { width: 200px; height: 60px; top: 80px; left: 60%; }
+
+/* --- SHARED MODAL OVERLAY --- */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- CALENDAR MODAL STYLES --- */
+.calendarModal {
+  background: #181818;
+  color: #e0e0e0;
+  width: 90%;
+  max-width: 1100px;
+  height: 85vh;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.calHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #222;
+  border-bottom: 1px solid #333;
+}
+
+.calHeaderLeft { display: flex; align-items: center; gap: 20px; }
+.calHeaderLeft h2 { margin: 0; font-size: 18px; font-weight: 500; color: #fff; }
+
+.calTodayBtn {
+  background: #333;
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.calArrows { display: flex; gap: 12px; color: #aaa; font-weight: bold; cursor: pointer; }
+.calHeaderRight { display: flex; align-items: center; gap: 16px; }
+
+.calCloseBtn { background: transparent; color: #fff; border: none; font-size: 18px; cursor: pointer; }
+.calCloseBtn:hover { color: #ff5252; }
+
+.calWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  padding: 12px 0;
+  background: #1e1e1e;
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  border-bottom: 1px solid #333;
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  flex: 1;
+  background: #333; 
+  gap: 1px; 
+}
+
+.calCell, .calCellEmpty {
+  background: #1a1a1a;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.2s;
+}
+
+.calCell:hover { background: #242424; }
+.calDayNum { font-size: 13px; color: #ccc; text-align: center; margin-bottom: 6px; }
+
+.calEventsContainer { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+
+.calEventPill {
+  font-size: 11px;
+  color: #111;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.calEventPill:hover { filter: brightness(1.1); }
+
+/* --- ADD / EDIT FORM MODAL STYLES --- */
+.formModal {
+  background: #ffffff;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalPopUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPopUp {
+  0% { transform: scale(0.95) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.formHeader {
+  padding: 24px 30px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.formHeader h2 { margin: 0; font-size: 20px; color: #1e293b; font-weight: 700; }
+
+.closeBtnLight {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.closeBtnLight:hover { background: #e2e8f0; color: #0f172a; }
+
+.eventForm {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formRow { display: flex; gap: 15px; }
+.formRow .formGroup { flex: 1; }
+
+.formGroup { display: flex; flex-direction: column; gap: 8px; }
+.formGroup label { font-size: 13px; font-weight: 600; color: #475569; }
+
+.formGroup input, .formGroup select {
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #1e293b;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.formGroup input:focus, .formGroup select:focus {
+  background: #ffffff;
+  border-color: #76b5d9;
+  box-shadow: 0 0 0 3px rgba(118, 181, 217, 0.2);
+}
+
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btnCancel {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.btnCancel:hover { background: #f1f5f9; color: #334155; }
+
+.btnSave {
+  padding: 10px 24px;
+  border: none;
+  background: #76b5d9;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(118, 181, 217, 0.4);
+  transition: all 0.2s;
+}
+
+.btnSave:hover { background: #62a3c7; transform: translateY(-1px); }
