@@ -6,9 +6,8 @@ import { FaHome, FaCalendarAlt, FaMap, FaUser } from 'react-icons/fa'
 export default function Sidebar() {
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.logo}>   
-        {/* placeholder logo icon */}
-        <img src="/logo.png" alt="logo" />
+      <div className={styles.logo}>
+        <img src="/images/logo.png" alt="logo" />
       </div>
       <nav className={styles.nav}>
         <ul>

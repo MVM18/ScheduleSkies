@@ -1,12 +1,25 @@
 /* Layout for dashboard home */
 .dashboard {
   display: flex;
+  flex-direction: column;
 }
 
 .dashboard-content {
   margin-left: 80px; /* sidebar width */
-  padding: 1rem 2rem;
-  flex: 1;
+  padding: 2rem 2rem;
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-header{
+  margin-left: 80px; /* sidebar width */
+  flex: 2;
+  height: 250px;
+  background-image: url("/images/home-header.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .row {
@@ -21,4 +34,19 @@
 
 .col.wide {
   flex: 2;
+}
+
+@media (max-width: 1024px) {
+  .row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-header {
+    margin-left: 0;
+  }
+  .dashboard-content{
+    margin-left: 0;
+  }
 }

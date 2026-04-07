@@ -6,15 +6,25 @@ export default function TrafficInfo({ incidents = [] }) {
   // incidents: [{level:'heavy'|'moderate',location:''},...]
   return (
     <div className={styles.container}>
-      {incidents.map((inc, idx) => (
-        <div key={idx} className={
-          inc.level === 'heavy' ? styles.heavy : styles.moderate
-        }>
-          <FaExclamationCircle className={styles.icon} />
-          <span className={styles.text}>{inc.level === 'heavy' ? 'HEAVY TRAFFIC' : 'MODERATE TRAFFIC'}</span>
-          <span className={styles.location}>{inc.location}</span>
-        </div>
-      ))}
+      <p className={styles.title}>TRAFFIC INFO</p>
+      <div className={styles.traffic_container}>
+        {incidents.map((inc, idx) => (
+          <div key={idx} className={
+            inc.level === 'heavy' ? styles.heavy : styles.moderate
+          }>
+            <div>
+              <FaExclamationCircle className={styles.icon} />
+            </div>
+
+            <div>
+              <p className={styles.text}>
+                {inc.level === 'heavy' ? 'HEAVY TRAFFIC' : 'MODERATE TRAFFIC'}
+              </p>
+              <p className={styles.location}>{inc.location}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
