@@ -1,7 +1,7 @@
 .container {
-  background-color: #fff;
+  background-color: #FFF4D8;
   padding: 1rem;
-  border-radius: 10px;
+  border-radius: 25px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -15,9 +15,10 @@
 .markAll {
   background: none;
   border: none;
-  color: #3498db;
+  color: #000;
   cursor: pointer;
   font-size: 0.9rem;
+  text-decoration: underline;
 }
 
 .note {

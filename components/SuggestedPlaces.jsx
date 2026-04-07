@@ -5,6 +5,7 @@ import { FaStar } from 'react-icons/fa'
 export default function SuggestedPlaces({ places = [] }) {
   return (
     <div className={styles.container}>
+      <p className={styles.title}>SUGGESTED PLACES</p>
       {places.map((p, idx) => (
         <div key={idx} className={styles.card}>
           <img src={p.image} alt={p.name} className={styles.image} />

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Sidebar from '@/components/Sidebar'
 import WeatherOverview from '@/components/WeatherOverview'
@@ -7,8 +7,39 @@ import TrafficInfo from '@/components/TrafficInfo'
 import Notifications from '@/components/Notifications'
 import UpcomingPlans from '@/components/UpcomingPlans'
 import SuggestedPlaces from '@/components/SuggestedPlaces'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function Home() {
+  const [username, setUsername] = useState('User')
+
+  useEffect(() => {
+    const fetchLoggedInUser = async () => {
+      const { data: authData } = await supabase.auth.getUser()
+      const user = authData?.user
+
+      if (!user) {
+        setUsername('User')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const displayName =
+        profile?.full_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'User'
+
+      setUsername(displayName)
+    }
+
+    fetchLoggedInUser()
+  }, [])
+
   return (
     <>
       <Head>
@@ -19,8 +50,11 @@ export default function Home() {
       </Head>
       <main className="dashboard">
         <Sidebar />
+        
+        <div className='home-header'>
+        <WeatherOverview username={username} />
+        </div>
         <div className="dashboard-content">
-          <WeatherOverview />
           <section className="row">
             <div className="col">
               <ForecastCards hours={[

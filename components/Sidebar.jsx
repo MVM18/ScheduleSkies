@@ -8,7 +8,7 @@ export default function Sidebar() {
     <aside className={styles.sidebar}>
       <div className={styles.logo}>   
         {/* placeholder logo icon */}
-        <img src="/logo.png" alt="logo" />
+        <img src="/images/logo.png" alt="logo" />
       </div>
       <nav className={styles.nav}>
         <ul>

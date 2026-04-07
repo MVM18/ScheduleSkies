@@ -6,6 +6,7 @@ export default function TrafficInfo({ incidents = [] }) {
   // incidents: [{level:'heavy'|'moderate',location:''},...]
   return (
     <div className={styles.container}>
+      <p>TRAFFIC INFO</p>
       {incidents.map((inc, idx) => (
         <div key={idx} className={
           inc.level === 'heavy' ? styles.heavy : styles.moderate

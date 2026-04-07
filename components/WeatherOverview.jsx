@@ -11,13 +11,15 @@ export default function WeatherOverview({ username = 'User', weather = {} }) {
   return (
     <div className={styles.overview}>
       <h1 className={styles.greeting}>Welcome Back, {username}</h1>
-      <p className={styles.date}>{formattedDate}</p>
-      <div className={styles.temperature}>{temperature}°C</div>
-      <p className={styles.feels}>Feels like {feelsLike}°C</p>
+      <div className={styles.temperatureContainer}>
+        <p className={styles.date}>{formattedDate}</p>
+        <div className={styles.temperature}>{temperature}°C</div>
+        <p className={styles.feels}>Feels like {feelsLike}°C</p>
+      </div>
       <div className={styles.metrics}>
-        <div>Humidity: {humidity}%</div>
-        <div>Precipitation: {precipitation}%</div>
-        <div>Wind: {wind}</div>
+        <div className={styles.metricsContainer}>Humidity: {humidity}%</div>
+        <div className={styles.metricsContainer}>Precipitation: {precipitation}%</div>
+        <div className={styles.metricsContainer}>Wind: {wind}</div>
       </div>
     </div>
   )

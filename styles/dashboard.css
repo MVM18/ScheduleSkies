@@ -1,12 +1,24 @@
 /* Layout for dashboard home */
 .dashboard {
   display: flex;
+  flex-direction: column;
 }
 
 .dashboard-content {
   margin-left: 80px; /* sidebar width */
-  padding: 1rem 2rem;
-  flex: 1;
+  padding: 2rem 2rem;
+  flex: 2;
+}
+
+.home-header{
+  margin-left: 80px; /* sidebar width */
+  flex: 2;
+  height: 250px;
+  width: auto;
+  background-image: url("/images/home-header.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .row {

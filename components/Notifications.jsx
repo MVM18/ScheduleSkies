@@ -14,7 +14,7 @@ export default function Notifications({ notes = [] }) {
     <div className={styles.container}>
       <div className={styles.header}>
         <h3>Notifications</h3>
-        <button className={styles.markAll}>Mark All Read →</button>
+        <button className={styles.markAll}>Mark All Read ✓</button>
       </div>
       {notes.map((n, idx) => (
         <div key={idx} className={styles.note}>

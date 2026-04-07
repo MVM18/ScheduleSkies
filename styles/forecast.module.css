@@ -1,6 +1,24 @@
 .container {
   display: flex;
+  flex-direction: column;
+  width: 500px;
+  height: 200px;
+  background-color: #FFF4D8;
   gap: 1rem;
+  border-radius: 25px;
+}
+
+.container p {
+  margin-top: 1rem;
+  margin-left: 2rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.cardContainer{
+  display: flex;
+  justify-items: center;
+  align-items: center;
 }
 
 .card {
@@ -8,19 +26,23 @@
   padding: 1rem;
   border-radius: 10px;
   text-align: center;
+  margin: auto;
   width: 80px;
 }
 
 .time {
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   margin-bottom: 0.5rem;
+  font-weight: 800;
 }
 
 .icon {
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
+  font-weight: 800;
 }
 
 .temp {
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 800;
 }
