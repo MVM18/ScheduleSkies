@@ -57,3 +57,9 @@
 .location {
   font-size: 0.75rem;
 }
+
+@media (max-width: 425px){
+  .text, .location {
+    font-size: 0.6rem;
+  }
+}

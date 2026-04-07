@@ -41,3 +41,12 @@
     flex-direction: column;
   }
 }
+
+@media (max-width: 768px) {
+  .home-header {
+    margin-left: 0;
+  }
+  .dashboard-content{
+    margin-left: 0;
+  }
+}

@@ -59,14 +59,10 @@
   align-items: center;
 }
 
-.date {
+.date, .time {
   font-size: 0.75rem;
   color: #888;
-}
-
-.time {
-  font-size: 0.75rem;
-  color: #888;
+  text-align: center;
 }
 
 .title_and_location {
@@ -86,9 +82,17 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  text-align: center;
 }
 
 .distance {
   font-size: 0.75rem;
   color: #000;
+  text-align: center;
+}
+
+@media (max-width: 425px) {
+  .date, .time, .title, .location, .distance {
+    font-size: 0.5rem;
+  }
 }

@@ -37,3 +37,23 @@
 .nav a:hover {
   color: #3498db;
 }
+
+@media (max-width: 768px){
+  .sidebar {
+    position: fixed;
+    top: auto; 
+    bottom: 10;
+    left: 5%;
+    width: 90%;
+    height: 80px;
+    border-radius: 15px;
+    flex-direction: row;
+    gap: 1rem;
+  }
+  .logo img {
+    visibility: hidden;
+  }
+  .nav ul {
+    flex-direction: row;
+}
+}
