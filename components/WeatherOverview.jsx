@@ -7,7 +7,14 @@ export default function WeatherOverview({ username = 'User', weather = {} }) {
   const options = { month: 'long', day: 'numeric', weekday: 'long' }
   const formattedDate = date.toLocaleDateString(undefined, options)
 
-  const [weatherData, setWeatherData] = useState(false);
+  const [weatherData, setWeatherData] = useState({
+    location: 'Cebu City',
+    temperature: weather.temperature ?? '--',
+    feelsLike: weather.feelsLike ?? '--',
+    humidity: weather.humidity ?? '--',
+    windSpeed: weather.wind ?? '--',
+    precipitation: weather.precipitation ?? 0
+  });
 
   const getWeatherData = async ()=>{
     const { lat, lon } = await getLocationWithFallback();
@@ -16,13 +23,15 @@ export default function WeatherOverview({ username = 'User', weather = {} }) {
       const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${process.env.NEXT_PUBLIC_WEATHER_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
-      console.log(data);
+      if (!response.ok || !data?.main) {
+        throw new Error(data?.message || 'Weather API returned invalid response');
+      }
       setWeatherData({
-        location: data.name,
+        location: data.name || 'Cebu City',
         temperature: Math.floor(data.main.temp),
         feelsLike: Math.floor(data.main.feels_like),
         humidity: data.main.humidity,
-        windSpeed: data.wind.speed,
+        windSpeed: data.wind?.speed ?? 0,
         precipitation: data.rain?.["1h"] ?? data.snow?.["1h"] ?? 0
       })
     }

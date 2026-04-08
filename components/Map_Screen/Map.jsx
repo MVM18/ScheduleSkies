@@ -202,22 +202,7 @@ const MapScreen = () => {
   ];
 
   return (
-    <div style={{ height: '100vh', width: '100%', display: 'flex', fontFamily: "'Segoe UI', sans-serif" }}>
-
-      {/* ── Left Sidebar ── */}
-      <div style={{ width: '70px', backgroundColor: '#1A365D', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', zIndex: 10 }}>
-        <div style={{ marginBottom: '32px' }}><span style={{ fontSize: '28px' }}>☁️</span></div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', flex: 1 }}>
-          {['🏠','📅'].map((icon, i) => (
-            <button key={i} style={{ background: 'none', border: 'none', color: 'white', fontSize: '22px', opacity: 0.6, cursor: 'pointer' }}>{icon}</button>
-          ))}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '3px', height: '28px', backgroundColor: '#FFD700', borderRadius: '2px', position: 'absolute', left: '-12px' }}></div>
-            <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '22px', cursor: 'pointer' }}>🗺️</button>
-          </div>
-          <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '22px', opacity: 0.6, cursor: 'pointer' }}>👤</button>
-        </div>
-      </div>
+    <div style={{ height: '100%', width: '100%', display: 'flex', fontFamily: "'Segoe UI', sans-serif" }}>
 
       {/* ── Main Area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px', gap: '10px', minWidth: 0 }}>
