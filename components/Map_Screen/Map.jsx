@@ -11,6 +11,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const GEOAPIFY_API_KEY = '6e3efd748a384a27baf68a0621732be5';
+const WEATHER_API_KEY = '177d6b3e957bb1d34b28bf7bdf9d1360';
 const mapStyle = 'osm-bright';
 
 const createIcon = (color) => L.divIcon({
@@ -46,6 +47,158 @@ function FlyTo({ coords }) {
     if (coords) map.flyTo(coords, 15, { duration: 1.2 });
   }, [coords, map]);
   return null;
+}
+
+// Weather Widget Component
+function WeatherWidget({ location }) {
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchWeather = useCallback(async (lat, lon) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`
+      );
+      const data = await response.json();
+
+      if (data.cod === 200) {
+        setWeather({
+          temp: Math.round(data.main.temp),
+          feelsLike: Math.round(data.main.feels_like),
+          condition: data.weather[0].main,
+          description: data.weather[0].description,
+          icon: data.weather[0].icon,
+          humidity: data.main.humidity,
+          windSpeed: Math.round(data.wind.speed * 3.6),
+          location: data.name
+        });
+      } else {
+        setError('Unable to fetch weather data');
+      }
+    } catch (err) {
+      console.error('Weather fetch error:', err);
+      setError('Weather service unavailable');
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (location) {
+      fetchWeather(location.lat, location.lng);
+    }
+  }, [location, fetchWeather]);
+
+  const getWeatherIcon = (condition) => {
+    const icons = {
+      'Clear': '☀️',
+      'Clouds': '☁️',
+      'Rain': '🌧️',
+      'Drizzle': '🌦️',
+      'Thunderstorm': '⛈️',
+      'Snow': '🌨️',
+      'Mist': '🌫️',
+      'Fog': '🌫️',
+      'Haze': '🌫️',
+    };
+    return icons[condition] || '🌤️';
+  };
+
+  const getWeatherBackground = (condition) => {
+    const backgrounds = {
+      'Clear': 'linear-gradient(135deg, #FFD700, #FFA500)',
+      'Clouds': 'linear-gradient(135deg, #B0BEC5, #78909C)',
+      'Rain': 'linear-gradient(135deg, #4FC3F7, #0288D1)',
+      'Drizzle': 'linear-gradient(135deg, #81D4FA, #4FC3F7)',
+      'Thunderstorm': 'linear-gradient(135deg, #5C6BC0, #283593)',
+      'Snow': 'linear-gradient(135deg, #E1F5FE, #B3E5FC)',
+      'Mist': 'linear-gradient(135deg, #CFD8DC, #90A4AE)',
+    };
+    return backgrounds[condition] || 'linear-gradient(135deg, #87CEEB, #4682B4)';
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        padding: '8px 14px',
+        borderRadius: '25px',
+        gap: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+        whiteSpace: 'nowrap',
+        opacity: 0.7
+      }}>
+        <span>⏳</span>
+        <span style={{ fontWeight: '600', color: '#333', fontSize: '13px' }}>Loading weather...</span>
+      </div>
+    );
+  }
+
+  if (error || !weather) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        padding: '8px 14px',
+        borderRadius: '25px',
+        gap: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+        whiteSpace: 'nowrap'
+      }}>
+        <span>🌤️</span>
+        <span style={{ fontWeight: '600', color: '#333', fontSize: '13px' }}>--°C · Weather</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      background: getWeatherBackground(weather.condition),
+      padding: '8px 14px',
+      borderRadius: '25px',
+      gap: '10px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      whiteSpace: 'nowrap',
+      color: weather.condition === 'Snow' ? '#333' : 'white',
+      cursor: 'pointer',
+      transition: 'transform 0.2s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+      title={`${weather.description} • Humidity: ${weather.humidity}% • Wind: ${weather.windSpeed} km/h`}
+    >
+      <span style={{ fontSize: '20px' }}>{getWeatherIcon(weather.condition)}</span>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={{ fontWeight: '700', fontSize: '14px' }}>
+          {weather.temp}°C
+        </span>
+        <span style={{ fontSize: '10px', opacity: 0.9 }}>
+          Feels {weather.feelsLike}°C
+        </span>
+      </div>
+      <div style={{
+        width: '1px',
+        height: '25px',
+        background: 'rgba(255,255,255,0.3)',
+        margin: '0 2px'
+      }} />
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={{ fontSize: '11px', fontWeight: '600' }}>
+          {weather.condition}
+        </span>
+        <span style={{ fontSize: '9px', opacity: 0.9 }}>
+          {weather.location || 'Current Location'}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function SearchInput({ placeholder, value, onChange, onSelect, icon }) {
@@ -108,9 +261,9 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon }) {
 const getTrafficColor = (segmentIndex, totalSegments) => {
   const currentHour = new Date().getHours();
   const isWeekend = [0, 6].includes(new Date().getDay());
-  
+
   const positionFactor = Math.abs((segmentIndex / totalSegments) - 0.5) * 2;
-  
+
   if (!isWeekend) {
     if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19)) {
       if (positionFactor < 0.3) {
@@ -147,10 +300,10 @@ const getTrafficColor = (segmentIndex, totalSegments) => {
 // Function to split route into colored segments based on traffic
 const getRouteSegmentsWithTraffic = (routeCoords) => {
   if (!routeCoords || routeCoords.length < 2) return [];
-  
+
   const segments = [];
   const totalSegments = routeCoords.length - 1;
-  
+
   for (let i = 0; i < totalSegments; i++) {
     const traffic = getTrafficColor(i, totalSegments);
     segments.push({
@@ -161,56 +314,52 @@ const getRouteSegmentsWithTraffic = (routeCoords) => {
       delayFactor: traffic.delayFactor
     });
   }
-  
+
   return segments;
 };
 
 // Custom map controls component
-function MapControls({ onZoomIn, onZoomOut, onTraffic, onLocation, onRoute }) {
+function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
   const map = useMap();
-  
+
   const handleZoomIn = () => {
     map.zoomIn();
     if (onZoomIn) onZoomIn();
   };
-  
+
   const handleZoomOut = () => {
     map.zoomOut();
     if (onZoomOut) onZoomOut();
   };
-  
-  const handleTraffic = () => {
-    if (onTraffic) onTraffic();
-  };
-  
+
   const handleLocation = () => {
     if (onLocation) onLocation();
   };
-  
+
   const handleRoute = () => {
     if (onRoute) onRoute();
   };
-  
+
   return (
-    <div style={{ 
-      position: 'absolute', 
-      right: '14px', 
-      top: '14px', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: '8px', 
-      zIndex: 1000 
+    <div style={{
+      position: 'absolute',
+      right: '14px',
+      top: '14px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      zIndex: 1000
     }}>
-      <button 
+      <button
         onClick={handleZoomIn}
-        style={{ 
-          backgroundColor: 'white', 
-          width: '38px', 
-          height: '38px', 
-          borderRadius: '8px', 
-          border: '1px solid #ddd', 
-          cursor: 'pointer', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)', 
+        style={{
+          backgroundColor: 'white',
+          width: '38px',
+          height: '38px',
+          borderRadius: '8px',
+          border: '1px solid #ddd',
+          cursor: 'pointer',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
           fontSize: '18px',
           fontWeight: 'bold',
           display: 'flex',
@@ -220,16 +369,16 @@ function MapControls({ onZoomIn, onZoomOut, onTraffic, onLocation, onRoute }) {
       >
         +
       </button>
-      <button 
+      <button
         onClick={handleZoomOut}
-        style={{ 
-          backgroundColor: 'white', 
-          width: '38px', 
-          height: '38px', 
-          borderRadius: '8px', 
-          border: '1px solid #ddd', 
-          cursor: 'pointer', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)', 
+        style={{
+          backgroundColor: 'white',
+          width: '38px',
+          height: '38px',
+          borderRadius: '8px',
+          border: '1px solid #ddd',
+          cursor: 'pointer',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
           fontSize: '18px',
           fontWeight: 'bold',
           display: 'flex',
@@ -240,34 +389,16 @@ function MapControls({ onZoomIn, onZoomOut, onTraffic, onLocation, onRoute }) {
         -
       </button>
       <div style={{ height: '1px', background: '#eee', margin: '4px 0' }}></div>
-      <button 
-        onClick={handleTraffic}
-        style={{ 
-          backgroundColor: 'white', 
-          width: '38px', 
-          height: '38px', 
-          borderRadius: '8px', 
-          border: '1px solid #ddd', 
-          cursor: 'pointer', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)', 
-          fontSize: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        🚦
-      </button>
-      <button 
+      <button
         onClick={handleLocation}
-        style={{ 
-          backgroundColor: 'white', 
-          width: '38px', 
-          height: '38px', 
-          borderRadius: '8px', 
-          border: '1px solid #ddd', 
-          cursor: 'pointer', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)', 
+        style={{
+          backgroundColor: 'white',
+          width: '38px',
+          height: '38px',
+          borderRadius: '8px',
+          border: '1px solid #ddd',
+          cursor: 'pointer',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
           fontSize: '16px',
           display: 'flex',
           alignItems: 'center',
@@ -276,16 +407,16 @@ function MapControls({ onZoomIn, onZoomOut, onTraffic, onLocation, onRoute }) {
       >
         🧭
       </button>
-      <button 
+      <button
         onClick={handleRoute}
-        style={{ 
-          backgroundColor: 'white', 
-          width: '38px', 
-          height: '38px', 
-          borderRadius: '8px', 
-          border: '1px solid #ddd', 
-          cursor: 'pointer', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)', 
+        style={{
+          backgroundColor: 'white',
+          width: '38px',
+          height: '38px',
+          borderRadius: '8px',
+          border: '1px solid #ddd',
+          cursor: 'pointer',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
           fontSize: '16px',
           display: 'flex',
           alignItems: 'center',
@@ -310,24 +441,24 @@ const getTrafficSummary = (segments) => {
       avgDelayFactor: 1
     };
   }
-  
+
   let heavyCount = 0;
   let moderateCount = 0;
   let lightCount = 0;
   let totalDelayFactor = 0;
-  
+
   segments.forEach(segment => {
     if (segment.level === 'heavy') heavyCount++;
     else if (segment.level === 'moderate') moderateCount++;
     else lightCount++;
     totalDelayFactor += segment.delayFactor;
   });
-  
+
   const avgDelayFactor = totalDelayFactor / segments.length;
-  
+
   let overallLevel = 'Light';
   let overallColor = '#4CAF50';
-  
+
   if (heavyCount > segments.length * 0.3) {
     overallLevel = 'Heavy';
     overallColor = '#C62828';
@@ -335,7 +466,7 @@ const getTrafficSummary = (segments) => {
     overallLevel = 'Moderate';
     overallColor = '#F57F17';
   }
-  
+
   return {
     level: overallLevel,
     color: overallColor,
@@ -349,10 +480,9 @@ const getTrafficSummary = (segments) => {
 // Mock places data for Cebu City (fallback if API fails)
 const getMockPlaces = (routeCoords) => {
   if (!routeCoords || routeCoords.length === 0) return [];
-  
-  // Use the first route point as reference
+
   const refPoint = routeCoords[0];
-  
+
   return [
     { name: 'AYALA Center Cebu', lat: 10.3189, lng: 123.9053, type: 'shopping', distance: 200, rating: 4.5 },
     { name: 'SM City Cebu', lat: 10.3106, lng: 123.8936, type: 'shopping', distance: 350, rating: 4.3 },
@@ -374,16 +504,15 @@ const getMockPlaces = (routeCoords) => {
 // Function to find places along the route
 const findPlacesAlongRoute = async (routeCoords) => {
   if (!routeCoords || routeCoords.length === 0) return [];
-  
+
   const places = [];
   const seenNames = new Set();
-  
-  // Try API first
+
   try {
     const sampleSize = Math.min(10, routeCoords.length);
     const step = Math.max(1, Math.floor(routeCoords.length / sampleSize));
     const samplePoints = routeCoords.filter((_, index) => index % step === 0);
-    
+
     const categories = [
       'catering.restaurant',
       'catering.cafe',
@@ -393,34 +522,34 @@ const findPlacesAlongRoute = async (routeCoords) => {
       'shopping.mall',
       'accommodation.hotel'
     ];
-    
+
     for (const point of samplePoints) {
       const url = `https://api.geoapify.com/v2/places?categories=${categories.join(',')}&filter=circle:${point[1]},${point[0]},1000&limit=10&apiKey=${GEOAPIFY_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data.features && data.features.length > 0) {
         data.features.forEach(feature => {
           const [lng, lat] = feature.geometry.coordinates;
           const name = feature.properties.name;
-          
+
           if (!name || seenNames.has(name)) return;
-          
+
           const category = feature.properties.categories?.[0] || '';
           let placeType = 'other';
-          
+
           if (category.includes('restaurant') || category.includes('cafe')) placeType = 'restaurant';
           else if (category.includes('parking')) placeType = 'parking';
           else if (category.includes('attraction')) placeType = 'attraction';
           else if (category.includes('park')) placeType = 'park';
           else if (category.includes('mall')) placeType = 'shopping';
           else if (category.includes('hotel')) placeType = 'hotel';
-          
+
           const distance = Math.sqrt(
-            Math.pow(lat - point[0], 2) + 
+            Math.pow(lat - point[0], 2) +
             Math.pow(lng - point[1], 2)
           ) * 111000;
-          
+
           seenNames.add(name);
           places.push({
             name: name,
@@ -436,8 +565,7 @@ const findPlacesAlongRoute = async (routeCoords) => {
   } catch (error) {
     console.error('API error, using mock data:', error);
   }
-  
-  // If no places found from API, use mock data
+
   if (places.length === 0) {
     console.log('No places from API, using mock data');
     const mockPlaces = getMockPlaces(routeCoords);
@@ -448,10 +576,9 @@ const findPlacesAlongRoute = async (routeCoords) => {
       }
     });
   }
-  
-  // Sort by distance
+
   places.sort((a, b) => a.distance - b.distance);
-  
+
   return places.slice(0, 25);
 };
 
@@ -471,13 +598,12 @@ const MapScreen = () => {
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [trafficSummary, setTrafficSummary] = useState(null);
+  const [weatherLocation, setWeatherLocation] = useState(null);
 
-  // Rerouting state
   const [originalDestination, setOriginalDestination] = useState(null);
   const [isRerouted, setIsRerouted] = useState(false);
   const [reroutedPlace, setReroutedPlace] = useState(null);
-  
-  // Sidebar place state
+
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [placeRouteCoords, setPlaceRouteCoords] = useState(null);
   const [placeRouteInfo, setPlaceRouteInfo] = useState(null);
@@ -485,7 +611,6 @@ const MapScreen = () => {
 
   const defaultPosition = [10.3204, 123.9242];
 
-  // Get user's current location
   const getUserLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -499,6 +624,7 @@ const MapScreen = () => {
           setOrigin(userLoc);
           setOriginText("Your Location");
           setFlyTo([userLoc.lat, userLoc.lng]);
+          setWeatherLocation(userLoc);
         },
         (error) => {
           console.error("Error getting location:", error);
@@ -510,7 +636,6 @@ const MapScreen = () => {
     }
   };
 
-  // Fetch places along the route
   const fetchPlacesAlongRoute = async (coords) => {
     setIsLoadingPlaces(true);
     const places = await findPlacesAlongRoute(coords);
@@ -518,18 +643,17 @@ const MapScreen = () => {
     setIsLoadingPlaces(false);
   };
 
-  // Main routing
   const handleOriginSelect = (place) => {
     setOrigin(place);
     setFlyTo([place.lat, place.lng]);
-    setRouteCoords(null); 
+    setRouteCoords(null);
     setRouteSegments([]);
-    setRouteInfo(null); 
+    setRouteInfo(null);
     setRouteError('');
     setNearbyPlaces([]);
     setTrafficSummary(null);
-    setSelectedPlace(null); 
-    setPlaceRouteCoords(null); 
+    setSelectedPlace(null);
+    setPlaceRouteCoords(null);
     setPlaceRouteInfo(null);
     setIsRerouted(false);
     setReroutedPlace(null);
@@ -538,43 +662,43 @@ const MapScreen = () => {
   const handleDestSelect = (place) => {
     setDestination(place);
     setFlyTo([place.lat, place.lng]);
-    setRouteCoords(null); 
+    setRouteCoords(null);
     setRouteSegments([]);
-    setRouteInfo(null); 
+    setRouteInfo(null);
     setRouteError('');
     setNearbyPlaces([]);
     setTrafficSummary(null);
-    setSelectedPlace(null); 
-    setPlaceRouteCoords(null); 
+    setSelectedPlace(null);
+    setPlaceRouteCoords(null);
     setPlaceRouteInfo(null);
     setIsRerouted(false);
     setReroutedPlace(null);
   };
 
   const fetchRoute = async (org, dst, mode, isReroute = false) => {
-    if (!org || !dst) { 
-      setRouteError('Please set both origin and destination.'); 
-      return; 
+    if (!org || !dst) {
+      setRouteError('Please set both origin and destination.');
+      return;
     }
-    setIsRouting(true); 
-    setRouteError(''); 
-    setRouteCoords(null); 
+    setIsRouting(true);
+    setRouteError('');
+    setRouteCoords(null);
     setRouteSegments([]);
     setRouteInfo(null);
     setNearbyPlaces([]);
     setTrafficSummary(null);
-    
+
     try {
       const url = `https://api.geoapify.com/v1/routing?waypoints=${org.lat},${org.lng}|${dst.lat},${dst.lng}&mode=${mode}&apiKey=${GEOAPIFY_API_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
-      
-      if (!data.features?.length) { 
-        setRouteError('No route found.'); 
-        setIsRouting(false); 
-        return; 
+
+      if (!data.features?.length) {
+        setRouteError('No route found.');
+        setIsRouting(false);
+        return;
       }
-      
+
       const feature = data.features[0];
       let coords = [];
       if (feature.geometry.type === 'MultiLineString') {
@@ -582,25 +706,25 @@ const MapScreen = () => {
       } else if (feature.geometry.type === 'LineString') {
         feature.geometry.coordinates.forEach(([lng, lat]) => coords.push([lat, lng]));
       }
-      
+
       setRouteCoords(coords);
-      
+
       const segments = getRouteSegmentsWithTraffic(coords);
       setRouteSegments(segments);
-      
+
       const summary = getTrafficSummary(segments);
       setTrafficSummary(summary);
-      
+
       const baseTime = Math.round(feature.properties.time / 60);
       const adjustedTime = Math.round(baseTime * (summary.avgDelayFactor || 1));
-      
-      setRouteInfo({ 
-        distance: (feature.properties.distance / 1000).toFixed(1), 
+
+      setRouteInfo({
+        distance: (feature.properties.distance / 1000).toFixed(1),
         time: baseTime,
         adjustedTime: adjustedTime,
         trafficDelay: adjustedTime - baseTime
       });
-      
+
       if (coords.length) {
         setFlyTo(coords[Math.floor(coords.length / 2)]);
         if (!isReroute) {
@@ -614,7 +738,6 @@ const MapScreen = () => {
     setIsRouting(false);
   };
 
-  // Handle rerouting to a place
   const handleRerouteToPlace = async (place) => {
     if (!origin && !userLocation) {
       alert('Please set an origin first (use "My Location" or enter a starting point)');
@@ -622,25 +745,24 @@ const MapScreen = () => {
     }
 
     const currentOrigin = origin || userLocation;
-    
+
     if (!isRerouted && destination) {
       setOriginalDestination(destination);
     }
-    
+
     setDestination(place);
     setDestText(place.name);
     setReroutedPlace(place);
     setIsRerouted(true);
-    
+
     await fetchRoute(currentOrigin, place, routeMode, true);
-    
+
     setSelectedPlace(null);
     setPlaceRouteCoords(null);
     setPlaceRouteInfo(null);
     setFlyTo([place.lat, place.lng]);
   };
 
-  // Undo rerouting
   const undoReroute = async () => {
     if (originalDestination) {
       const currentOrigin = origin || userLocation;
@@ -648,16 +770,15 @@ const MapScreen = () => {
       setDestText(originalDestination.label);
       setIsRerouted(false);
       setReroutedPlace(null);
-      
+
       await fetchRoute(currentOrigin, originalDestination, routeMode, false);
-      
+
       setFlyTo([originalDestination.lat, originalDestination.lng]);
     }
   };
 
-  // Get icon for place type
   const getPlaceIcon = (type) => {
-    switch(type) {
+    switch (type) {
       case 'restaurant': return '🍽️';
       case 'parking': return '🅿️';
       case 'attraction': return '🏛️';
@@ -668,31 +789,42 @@ const MapScreen = () => {
     }
   };
 
-  // Filter places by type
   const getFilteredPlaces = () => {
     if (placeTypeFilter === 'all') return nearbyPlaces;
     return nearbyPlaces.filter(place => place.type === placeTypeFilter);
   };
 
   const clearAll = () => {
-    setOrigin(null); 
+    setOrigin(null);
     setDestination(null);
-    setOriginText(''); 
+    setOriginText('');
     setDestText('');
-    setRouteCoords(null); 
+    setRouteCoords(null);
     setRouteSegments([]);
-    setRouteInfo(null); 
+    setRouteInfo(null);
     setRouteError('');
     setNearbyPlaces([]);
     setTrafficSummary(null);
-    setSelectedPlace(null); 
-    setPlaceRouteCoords(null); 
+    setSelectedPlace(null);
+    setPlaceRouteCoords(null);
     setPlaceRouteInfo(null);
     setIsRerouted(false);
     setReroutedPlace(null);
     setOriginalDestination(null);
     setFlyTo(defaultPosition);
   };
+
+  useEffect(() => {
+    if (origin) {
+      setWeatherLocation(origin);
+    } else if (userLocation) {
+      setWeatherLocation(userLocation);
+    }
+  }, [origin, userLocation]);
+
+  useEffect(() => {
+    setWeatherLocation({ lat: 10.3204, lng: 123.9242 });
+  }, []);
 
   const modeOptions = [
     { key: 'drive', icon: '🚗', label: 'Drive' },
@@ -711,49 +843,42 @@ const MapScreen = () => {
   ];
 
   return (
-    <div style={{ 
-      height: '100vh', 
-      width: '100vw', 
-      display: 'flex', 
-      fontFamily: "'Segoe UI', sans-serif", 
+    <div style={{
+      height: '100%',
+      width: '100%',
+      display: 'flex',
+      fontFamily: "'Segoe UI', sans-serif",
       overflow: 'hidden',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0
+      position: 'relative',
+
+      pointerEvents: 'none'
     }}>
 
-      {/* Main Area - marginLeft set to 100px */}
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        padding: '12px', 
-        gap: '10px', 
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '12px',
+        gap: '10px',
         minWidth: 0,
         overflow: 'hidden',
-        marginLeft: '100px',
-        marginRight: nearbyPlaces.length > 0 ? '40px' : '0'
+        paddingLeft: '10px',
+        marginRight: nearbyPlaces.length > 0 ? '40px' : '0',
+        pointerEvents: 'auto'
       }}>
 
-        {/* Top bar */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', flexShrink: 0, zIndex: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'white', padding: '8px 14px', borderRadius: '25px', gap: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' }}>
-            <span>☀️</span>
-            <span style={{ fontWeight: '600', color: '#333', fontSize: '13px' }}>37°C · Sunny</span>
-          </div>
+          <WeatherWidget location={weatherLocation} />
 
-          {/* Routing Panel */}
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <SearchInput 
-                  placeholder="From — origin location" 
-                  value={originText} 
-                  onChange={setOriginText} 
-                  onSelect={handleOriginSelect} 
-                  icon="🟦" 
+                <SearchInput
+                  placeholder="From — origin location"
+                  value={originText}
+                  onChange={setOriginText}
+                  onSelect={handleOriginSelect}
+                  icon="🟦"
                 />
                 <button
                   onClick={getUserLocation}
@@ -771,13 +896,13 @@ const MapScreen = () => {
                   My Location
                 </button>
               </div>
-              
-              <SearchInput 
-                placeholder="To — destination" 
-                value={destText} 
-                onChange={setDestText} 
-                onSelect={handleDestSelect} 
-                icon="🔴" 
+
+              <SearchInput
+                placeholder="To — destination"
+                value={destText}
+                onChange={setDestText}
+                onSelect={handleDestSelect}
+                icon="🔴"
               />
 
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -789,7 +914,7 @@ const MapScreen = () => {
                 <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
                   style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '13px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
                 >{isRouting ? 'Routing...' : 'Go'}</button>
-                
+
                 {isRerouted && (
                   <button onClick={undoReroute}
                     style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FF9800', color: 'white', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}
@@ -797,15 +922,14 @@ const MapScreen = () => {
                     Undo
                   </button>
                 )}
-                
+
                 {(origin || destination || routeCoords) && (
                   <button onClick={clearAll} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>
                 )}
               </div>
 
               {routeError && <div style={{ fontSize: '12px', color: '#E53E3E', padding: '5px 10px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
-              
-              {/* Route Information */}
+
               {routeInfo && (
                 <div style={{ display: 'flex', gap: '12px', padding: '7px 12px', background: '#EBF8FF', borderRadius: '10px', fontSize: '12px', fontWeight: '700', color: '#2C5282' }}>
                   <span>📏 {routeInfo.distance} km</span>
@@ -817,7 +941,6 @@ const MapScreen = () => {
           </div>
         </div>
 
-        {/* Place Type Filter - shows when places are found */}
         {nearbyPlaces.length > 0 && !isRerouted && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', zIndex: 2, flexShrink: 0 }}>
             <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '6px', color: '#666' }}>Filter places:</div>
@@ -846,12 +969,11 @@ const MapScreen = () => {
           </div>
         )}
 
-        {/* Map */}
         <div style={{ flex: 1, borderRadius: '24px', border: '6px solid #2C5282', overflow: 'hidden', position: 'relative', minHeight: 0, zIndex: 1 }}>
-          <MapContainer 
-            center={defaultPosition} 
-            zoom={14} 
-            style={{ height: '100%', width: '100%' }} 
+          <MapContainer
+            center={defaultPosition}
+            zoom={14}
+            style={{ height: '100%', width: '100%' }}
             zoomControl={false}
           >
             <TileLayer
@@ -860,26 +982,21 @@ const MapScreen = () => {
             />
             {flyTo && <FlyTo coords={flyTo} />}
 
-            {/* Custom Map Controls */}
-            <MapControls 
-              onZoomIn={() => {}}
-              onZoomOut={() => {}}
-              onTraffic={() => alert('Traffic layer toggled')}
+            <MapControls
+              onZoomIn={() => { }}
+              onZoomOut={() => { }}
               onLocation={getUserLocation}
               onRoute={() => fetchRoute(origin || userLocation, destination, routeMode, false)}
             />
 
-            {/* User location marker */}
             {userLocation && !origin && (
               <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
                 <Popup><strong>Your Location</strong></Popup>
               </Marker>
             )}
 
-            {/* Origin marker */}
             {origin && <Marker position={[origin.lat, origin.lng]} icon={originIcon}><Popup><strong>Origin</strong><br />{origin.label}</Popup></Marker>}
 
-            {/* Destination marker */}
             {destination && <Marker position={[destination.lat, destination.lng]} icon={destIcon}>
               <Popup>
                 <strong>Destination</strong><br />
@@ -888,26 +1005,24 @@ const MapScreen = () => {
               </Popup>
             </Marker>}
 
-            {/* Route segments with traffic-based coloring */}
             {routeSegments.map((segment, idx) => (
-              <Polyline 
+              <Polyline
                 key={idx}
-                positions={[segment.start, segment.end]} 
-                pathOptions={{ 
-                  color: segment.color, 
-                  weight: 6, 
+                positions={[segment.start, segment.end]}
+                pathOptions={{
+                  color: segment.color,
+                  weight: 6,
                   opacity: 0.9,
                   lineCap: 'round',
                   lineJoin: 'round'
-                }} 
+                }}
               />
             ))}
 
-            {/* Places along route markers */}
             {!isRerouted && getFilteredPlaces().map((place, idx) => (
-              <Marker 
-                key={idx} 
-                position={[place.lat, place.lng]} 
+              <Marker
+                key={idx}
+                position={[place.lat, place.lng]}
                 icon={L.divIcon({
                   className: '',
                   html: `<div style="
@@ -927,7 +1042,7 @@ const MapScreen = () => {
                   <span>Type: {place.type}<br /></span>
                   {place.address && <span>{place.address}<br /></span>}
                   <span>Distance: {place.distance}m</span><br />
-                  <button 
+                  <button
                     onClick={() => handleRerouteToPlace(place)}
                     style={{
                       marginTop: '8px',
@@ -947,7 +1062,6 @@ const MapScreen = () => {
             ))}
           </MapContainer>
 
-          {/* Loading indicators */}
           {isLoadingPlaces && (
             <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', zIndex: 1000 }}>
               Finding places along your route...
@@ -956,19 +1070,19 @@ const MapScreen = () => {
         </div>
       </div>
 
-      {/* Right Sidebar - Places along route */}
       {nearbyPlaces.length > 0 && !isRerouted && (
-        <div style={{ 
-          width: '280px', 
-          backgroundColor: '#81D4FA', 
-          padding: '14px', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          overflowY: 'auto', 
+        <div style={{
+          width: '280px',
+          backgroundColor: '#81D4FA',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
           gap: '8px',
           flexShrink: 0,
           position: 'relative',
-          zIndex: 2
+          zIndex: 2,
+          pointerEvents: 'auto'
         }}>
           <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', margin: '0 0 4px', textAlign: 'center' }}>
             Places Along Route
@@ -981,12 +1095,12 @@ const MapScreen = () => {
             <div key={i}
               style={{
                 backgroundColor: 'white',
-                borderRadius: '14px', 
+                borderRadius: '14px',
                 padding: '10px',
-                display: 'flex', 
+                display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
-                cursor: 'pointer', 
+                cursor: 'pointer',
                 transition: 'all 0.18s',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
               }}
@@ -1006,7 +1120,7 @@ const MapScreen = () => {
                   </div>
                 </div>
               </div>
-              
+
               <button
                 onClick={() => handleRerouteToPlace(place)}
                 style={{
@@ -1026,12 +1140,11 @@ const MapScreen = () => {
             </div>
           ))}
 
-          {/* Reroute info section */}
           {isRerouted && reroutedPlace && (
-            <div style={{ 
-              marginTop: '12px', 
-              padding: '12px', 
-              background: '#FFF3E0', 
+            <div style={{
+              marginTop: '12px',
+              padding: '12px',
+              background: '#FFF3E0',
               borderRadius: '12px',
               border: '1px solid #FF9800'
             }}>
@@ -1060,11 +1173,10 @@ const MapScreen = () => {
             </div>
           )}
 
-          {/* Traffic Summary at Bottom of Panel */}
           {trafficSummary && routeInfo && (
-            <div style={{ 
+            <div style={{
               marginTop: 'auto',
-              padding: '12px', 
+              padding: '12px',
               background: trafficSummary.level === 'Heavy' ? '#FFEBEE' : trafficSummary.level === 'Moderate' ? '#FFF3E0' : '#E8F5E9',
               borderRadius: '12px',
               borderTop: `3px solid ${trafficSummary.color}`
@@ -1077,13 +1189,13 @@ const MapScreen = () => {
                   {trafficSummary.level} Traffic
                 </span>
               </div>
-              
+
               <div style={{ fontSize: '10px', color: '#666', marginBottom: '6px' }}>
                 {trafficSummary.heavySegments > 0 && `🔴 ${trafficSummary.heavySegments} heavy • `}
                 {trafficSummary.moderateSegments > 0 && `🟠 ${trafficSummary.moderateSegments} moderate • `}
                 🟢 {trafficSummary.lightSegments} light
               </div>
-              
+
               <div style={{ fontSize: '11px', fontWeight: '600', color: trafficSummary.color }}>
                 Est. delay: {routeInfo.trafficDelay} min
               </div>

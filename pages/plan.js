@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import { getLocationWithFallback } from "@/lib/getLocation";
+import { buildWeatherContext, detectScheduleConflicts } from '@/lib/aiContext';
 import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar'; 
 
@@ -54,6 +55,11 @@ const MyEvents = () => {
   const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food' };
   const [formData, setFormData] = useState(initialFormState);
 
+  // AI Suggestions State
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure']; 
 
@@ -89,6 +95,90 @@ const MyEvents = () => {
     };
     fetchWeather();
   }, []);
+
+  // --- AI ANALYSIS ---
+  const handleAiAnalysis = async () => {
+    setIsAiLoading(true);
+    setShowAiPanel(true);
+    setAiSuggestions([]);
+
+    try {
+      // Detect conflicts locally
+      const conflicts = detectScheduleConflicts(eventData);
+
+      // Get weather context
+      const { lat, lon } = await getLocationWithFallback();
+      const weatherCtx = await buildWeatherContext(lat, lon);
+
+      // Call AI endpoint
+      const response = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Analyze my itinerary. Check for conflicts, suggest weather-based adjustments, and recommend improvements. Be specific about each event.',
+          context: {
+            events: eventData.map(e => ({ title: e.title, location: e.location, date: e.date, category: e.category, price: e.price })),
+            weather: weatherCtx,
+            location: userLocation,
+            conflicts,
+            currentWeather: { temp: temperature, description: 'Current', city: userLocation },
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      const newSuggestions = [];
+
+      // Add conflict suggestions
+      if (conflicts.length > 0) {
+        conflicts.forEach(c => {
+          newSuggestions.push({
+            type: c.severity === 'warning' ? 'warning' : 'info',
+            icon: c.severity === 'warning' ? '⚠️' : 'ℹ️',
+            title: c.type === 'overloaded' ? 'Busy Day Alert' : c.type === 'duplicate_location' ? 'Duplicate Location' : 'Travel Time Check',
+            message: c.message,
+          });
+        });
+      }
+
+      // Add AI analysis
+      if (data.reply) {
+        newSuggestions.push({
+          type: 'ai',
+          icon: '✨',
+          title: 'AI Itinerary Analysis',
+          message: data.reply,
+        });
+      }
+
+      if (newSuggestions.length === 0) {
+        newSuggestions.push({
+          type: 'success',
+          icon: '✅',
+          title: 'All Good!',
+          message: 'No issues detected. Your schedule looks well-organized!',
+        });
+      }
+
+      setAiSuggestions(newSuggestions);
+    } catch (err) {
+      console.error('AI analysis failed:', err);
+      setAiSuggestions([{
+        type: 'warning',
+        icon: '⚠️',
+        title: 'Analysis Unavailable',
+        message: 'Could not complete the analysis. Please try again.',
+      }]);
+    }
+
+    setIsAiLoading(false);
+  };
+
+  const dismissSuggestion = (index) => {
+    setAiSuggestions(prev => prev.filter((_, i) => i !== index));
+    if (aiSuggestions.length <= 1) setShowAiPanel(false);
+  };
 
   // --- 4. FORM & EVENT LOGIC ---
   const handleOpenAddForm = () => {
@@ -251,10 +341,67 @@ const MyEvents = () => {
             >
               <span style={{ fontSize: '14px', color: '#76b5d9' }}>✎</span> {isEditListMode ? 'Done' : 'Edit'}
             </button>
+            <button 
+              className={styles.actionBtn}
+              onClick={handleAiAnalysis}
+              disabled={isAiLoading}
+              style={{ background: isAiLoading ? 'rgba(102, 126, 234, 0.15)' : undefined }}
+            >
+              <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
+            </button>
           </div>
         </div>
 
         {/* Event List */}
+        {/* AI Suggestions Panel */}
+        {showAiPanel && aiSuggestions.length > 0 && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '14px', color: '#1a365d', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ✨ AI Suggestions
+              </h3>
+              <button 
+                onClick={() => { setShowAiPanel(false); setAiSuggestions([]); }}
+                style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}
+              >✕</button>
+            </div>
+            {aiSuggestions.map((s, i) => (
+              <div key={i} style={{
+                background: s.type === 'warning' ? 'rgba(237, 137, 54, 0.08)' : s.type === 'success' ? 'rgba(72, 187, 120, 0.08)' : 'rgba(102, 126, 234, 0.08)',
+                border: `1px solid ${s.type === 'warning' ? 'rgba(237, 137, 54, 0.25)' : s.type === 'success' ? 'rgba(72, 187, 120, 0.25)' : 'rgba(102, 126, 234, 0.2)'}`,
+                borderRadius: '12px',
+                padding: '12px 14px',
+                position: 'relative',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '16px' }}>{s.icon}</span>
+                  <strong style={{ fontSize: '13px', color: '#2d3748' }}>{s.title}</strong>
+                  <button 
+                    onClick={() => dismissSuggestion(i)}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '14px' }}
+                  >✕</button>
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#4a5568', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+                  {s.message}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* AI Loading Indicator */}
+        {isAiLoading && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            padding: '16px', marginBottom: '12px',
+            background: 'rgba(102, 126, 234, 0.06)', borderRadius: '12px',
+            border: '1px solid rgba(102, 126, 234, 0.15)',
+          }}>
+            <span style={{ fontSize: '18px', animation: 'spin 1s linear infinite' }}>✨</span>
+            <span style={{ fontSize: '13px', color: '#5a67d8', fontWeight: 600 }}>Analyzing your itinerary...</span>
+          </div>
+        )}
+
         <section className={styles.eventList}>
           {filteredEvents.length === 0 ? (
             <div className={styles.emptyState}>No events found. Click "Add" to create one!</div>
