@@ -29,7 +29,6 @@ const MyEvents = () => {
   };
 
   const fetchEvents = async () => {
-    // RLS handles user isolation automatically if set up in Supabase
     const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
     if (data && !error) {
       setEventData(data.map(generateDynamicProps));
@@ -285,7 +284,14 @@ const MyEvents = () => {
 
   return (
     <div className={styles.appContainer}>
-       <Sidebar />
+      
+      {/* This wrapper guarantees the Sidebar (and its mobile downbar) 
+        sits entirely on top of the main content 
+      */}
+      <div style={{ position: 'relative', zIndex: 9999 }}>
+        <Sidebar />
+      </div>
+
       <main className={styles.mainContent}>
         {/* Sky Decorations */}
         <div className={styles.sun}></div>
@@ -327,7 +333,7 @@ const MyEvents = () => {
             </button>
           ))}
           
-          {/* Action Group */}
+          {/* Action Group (Desktop Only) */}
           <div className={styles.actionGroup}>
             <button className={styles.actionBtn} onClick={() => setIsCalendarOpen(true)}>
               <span style={{ fontSize: '14px', color: '#76b5d9' }}>📅</span> Calendar
@@ -446,7 +452,41 @@ const MyEvents = () => {
             ))
           )}
         </section>
-      </main>
+      </main> {/* THIS IS WHERE THE MAIN TAG MUST CLOSE */}
+
+      {/* --- MOBILE FLOATING ACTION PILL (Now completely outside of main content) --- */}
+      <div className={styles.mobileFloatingActions}>
+        {/* Edit Button */}
+        <button 
+          className={`${styles.mobileActionBtn} ${isEditListMode ? styles.activeEdit : ''}`}
+          onClick={() => setIsEditListMode(!isEditListMode)}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </button>
+        
+        {/* Add Button */}
+        <button className={styles.mobileActionBtn} onClick={handleOpenAddForm}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+        </button>
+
+        {/* Calendar Button */}
+        <button className={styles.mobileActionBtn} onClick={() => setIsCalendarOpen(true)}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <path d="M9 16l2 2 4-4"></path>
+          </svg>
+        </button>
+      </div>
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
       {isFormOpen && (
