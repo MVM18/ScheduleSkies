@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar'
 
-const MapScreen = dynamic(() => import('../components/Map_Screen/Map'), {
+const MapScreen = dynamic(() => import('../components/Map_Screen/map.jsx'), {
   ssr: false
 });
 
