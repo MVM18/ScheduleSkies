@@ -582,7 +582,7 @@ const findPlacesAlongRoute = async (routeCoords) => {
   return places.slice(0, 25);
 };
 
-const MapScreen = () => {
+const MapScreen = ({ venueCoords }) => {
   const [originText, setOriginText] = useState('');
   const [destText, setDestText] = useState('');
   const [origin, setOrigin] = useState(null);
@@ -611,6 +611,21 @@ const MapScreen = () => {
 
   const defaultPosition = [10.3204, 123.9242];
 
+  // Auto-navigate to venue when venueCoords prop is provided (from itinerary)
+  useEffect(() => {
+    if (venueCoords && venueCoords.lat && venueCoords.lng) {
+      const venueDest = {
+        lat: venueCoords.lat,
+        lng: venueCoords.lng,
+        label: venueCoords.label || 'Event Venue'
+      };
+      setDestination(venueDest);
+      setDestText(venueDest.label);
+      setFlyTo([venueDest.lat, venueDest.lng]);
+    }
+  }, [venueCoords]);
+
+  // Get user's current location
   const getUserLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
