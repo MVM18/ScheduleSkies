@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import styles from '../styles/weather.module.css'
-import { getLocationWithFallback } from "@/lib/getLocation";
+import { getLocationWithFallback } from '@/lib/getLocation'
 
 export default function WeatherOverview({ username = 'User', weather = {} }) {
   const date = new Date()
