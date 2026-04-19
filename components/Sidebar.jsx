@@ -36,30 +36,30 @@ export default function Sidebar() {
         <ul>
           <li>
             <Link href="/">
-            <div className='btn'>
-              <HomeIcon className={styles.icon} fill="currentColor" />
-            </div>
+              <div className={`btn ${router.pathname === '/' ? styles.active : ''}`}>
+                <HomeIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/plan">
-            <div className='btn'>
-              <EventsIcon className={styles.icon} fill="#000" />
-            </div>
+              <div className={`btn ${router.pathname === '/plan' ? styles.active : ''}`}>
+                <EventsIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/map">
-            <div className='btn'>
-              <MapIcon className={styles.icon} fill="currentColor" />
-            </div>
+              <div className={`btn ${router.pathname === '/map' ? styles.active : ''}`}>
+                <MapIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/profile">
-            <div className='btn'>
-              <ProfileIcon className={styles.icon} fill="currentColor" />
-            </div>
+              <div className={`btn ${router.pathname === '/profile' ? styles.active : ''}`}>
+                <ProfileIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
         </ul>
