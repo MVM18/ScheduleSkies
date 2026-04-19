@@ -28,7 +28,7 @@
 }
 
 .nav a {
-  color: #ecf0f1;
+  color: #000;
   font-size: 1.5rem;
   display: flex;
   align-items: center;
@@ -37,6 +37,15 @@
 
 .nav a:hover {
   color: #3498db;
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+}
+
+.icon path {
+  fill: #000;
 }
 
 .quickMenuContainer {
@@ -140,5 +149,11 @@
     bottom: 70px;
     left: auto;
     right: 10px;
+  }
+}
+
+@media (max-width: 425px){
+  .nav ul {
+    gap: 1rem;
   }
 }

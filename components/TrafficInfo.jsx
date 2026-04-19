@@ -23,20 +23,45 @@ export default function TrafficInfo() {
   };
 
   const [incidentData, setIncidentData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const CACHE_TTL = 1000 * 60 * 5; // 5 minutes — traffic changes fast
+  const CACHE_KEY = 'traffic_cache';
 
   async function loadIncidents() {
-    const bbox = await getBboxFromUserLocation(5); // 5 km radius
+    // Check cache first
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY));
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        setIncidentData(cached.data);
+        setLoading(false);
+        return;
+      }
+    } catch (_) {}
+
+    const bbox = await getBboxFromUserLocation(5);
 
     const fields = encodeURIComponent("{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description},startTime,endTime,from,to}}}");
 
     const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?key=${process.env.NEXT_PUBLIC_TRAFFIC_API_KEY}&bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present`;
 
-    const response = await fetch(url);
-    const data = await response.json();
-    console.log(data.incidents);
-    const incidentArray = await transformIncidents(data);
-    console.log(incidentArray);
-    setIncidentData(incidentArray);
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const incidentArray = await transformIncidents(data);
+
+      // Save to cache
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: incidentArray,
+        timestamp: Date.now()
+      }));
+
+      setIncidentData(incidentArray);
+    } catch(error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function transformIncidents(data) {
@@ -101,26 +126,34 @@ export default function TrafficInfo() {
     <div className={styles.container}>
       <p className={styles.title}>TRAFFIC INFO</p>
       <div className={styles.traffic_container}>
-        {incidentData.map((inc, idx) => (
-          <div key={inc.id} className={
-            inc.delayLevel > 2 ? styles.heavy : styles.moderate
-          }>
-            <div className={styles.icon}>
-              <span>{iconMap[inc.iconCategory] || "⚠️"}</span>
-            </div>
-
-            <div>
-              <p className={styles.text}>
-                {inc.title || inc.from}
-              </p>
-              <p className={styles.location}>
-                {inc.from && inc.to
-                  ? `${inc.from} - ${inc.to}`
-                  : "blank"}
-              </p>
-            </div>
+        {loading ? (
+          <div className="spinner-container">
+            <div className="loading-spinner"></div>
           </div>
-        ))}
+        ) : incidentData.length > 0 ? (
+            incidentData.map((inc, idx) => (
+              <div key={inc.id} className={
+                inc.delayLevel > 2 ? styles.heavy : styles.moderate
+              }>
+                <div className={styles.icon}>
+                  <span>{iconMap[inc.iconCategory] || "⚠️"}</span>
+                </div>
+
+                <div>
+                  <p className={styles.text}>
+                    {inc.title || inc.from}
+                  </p>
+                  <p className={styles.location}>
+                    {inc.from && inc.to
+                      ? `${inc.from} - ${inc.to}`
+                      : `${inc.location}`}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (   
+          <div className={styles.empty_state}>No traffic information found.</div>
+        )}
       </div>
     </div>
   )
