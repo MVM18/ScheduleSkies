@@ -161,6 +161,11 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE PROCEDURE public.handle_new_user();
 
+-- 6. ADD LATITUDE AND LONGITUDE TO ITINERARY_ACTIVITIES TABLE
+-- ============================================================================
+ALTER TABLE public.itinerary_activities ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE public.itinerary_activities ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+
 -- ============================================================================
 -- VERIFICATION QUERIES (Run these to check tables were created)
 -- ============================================================================
@@ -168,3 +173,4 @@ CREATE TRIGGER on_auth_user_created
 -- SELECT * FROM public.saved_locations LIMIT 1;
 -- SELECT * FROM public.saved_itineraries LIMIT 1;
 -- SELECT * FROM public.user_analytics LIMIT 1;
+-- SELECT * FROM public.itinerary_activities LIMIT 1;

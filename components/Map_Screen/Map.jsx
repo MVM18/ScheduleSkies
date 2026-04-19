@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
+import { useRouter } from 'next/router';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -47,6 +48,28 @@ function FlyTo({ coords }) {
     if (coords) map.flyTo(coords, 15, { duration: 1.2 });
   }, [coords, map]);
   return null;
+}
+
+function MapPickClickHandler({ enabled, onLatLngClick }) {
+  useMapEvents({
+    click(e) {
+      if (enabled) onLatLngClick(e.latlng);
+    },
+  });
+  return null;
+}
+
+async function reverseGeocodeLatLng(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { Accept: 'application/json' } }
+    );
+    const data = await res.json();
+    return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch {
+    return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+  }
 }
 
 // Weather Widget Component
@@ -582,7 +605,21 @@ const findPlacesAlongRoute = async (routeCoords) => {
   return places.slice(0, 25);
 };
 
-const MapScreen = ({ venueCoords }) => {
+const MapScreen = ({
+  venueCoords,
+  itineraryWaypoints,
+  searchLabel,
+  pickMode = false,
+  pickContext = 'event',
+  pickInitialCoords = null,
+  pickHintLabel = '',
+  returnPath = '/plan',
+}) => {
+  const router = useRouter();
+  const [pickedPoint, setPickedPoint] = useState(null);
+  const [pickedLabel, setPickedLabel] = useState('');
+  const [pickLoading, setPickLoading] = useState(false);
+
   const [originText, setOriginText] = useState('');
   const [destText, setDestText] = useState('');
   const [origin, setOrigin] = useState(null);
@@ -611,6 +648,10 @@ const MapScreen = ({ venueCoords }) => {
 
   const defaultPosition = [10.3204, 123.9242];
 
+  // Itinerary waypoints state
+  const [waypointsList, setWaypointsList] = useState([]);
+  const [currentWaypointIndex, setCurrentWaypointIndex] = useState(0);
+
   // Auto-navigate to venue when venueCoords prop is provided (from itinerary)
   useEffect(() => {
     if (venueCoords && venueCoords.lat && venueCoords.lng) {
@@ -625,14 +666,114 @@ const MapScreen = ({ venueCoords }) => {
     }
   }, [venueCoords]);
 
+  // Auto-fill destination text when searchLabel is provided (activity location without coords)
+  useEffect(() => {
+    if (searchLabel) {
+      setDestText(searchLabel);
+    }
+  }, [searchLabel]);
+
+  // Auto-load itinerary waypoints
+  useEffect(() => {
+    if (itineraryWaypoints && itineraryWaypoints.length > 0) {
+      setWaypointsList(itineraryWaypoints);
+      setCurrentWaypointIndex(0);
+      // Set first waypoint with coordinates as destination
+      const first = itineraryWaypoints.find(w => w.lat && w.lng);
+      if (first) {
+        const dest = { lat: first.lat, lng: first.lng, label: first.label || 'Waypoint 1' };
+        setDestination(dest);
+        setDestText(dest.label);
+        setFlyTo([dest.lat, dest.lng]);
+      }
+    }
+  }, [itineraryWaypoints]);
+
+  useEffect(() => {
+    if (!pickMode || pickInitialCoords?.lat == null || pickInitialCoords?.lng == null) return;
+    let cancelled = false;
+    (async () => {
+      setPickLoading(true);
+      const { lat, lng } = pickInitialCoords;
+      setPickedPoint({ lat, lng });
+      setFlyTo([lat, lng]);
+      const name = await reverseGeocodeLatLng(lat, lng);
+      if (!cancelled) {
+        setPickedLabel(pickHintLabel || name);
+        setPickLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickMode, pickInitialCoords?.lat, pickInitialCoords?.lng, pickHintLabel]);
+
+  const handlePickMapClick = async (latlng) => {
+    setPickLoading(true);
+    setPickedPoint({ lat: latlng.lat, lng: latlng.lng });
+    setFlyTo([latlng.lat, latlng.lng]);
+    const name = await reverseGeocodeLatLng(latlng.lat, latlng.lng);
+    setPickedLabel(name);
+    setPickLoading(false);
+  };
+
+  const confirmPick = () => {
+    if (!pickedPoint) return;
+    try {
+      sessionStorage.setItem(
+        'scheduleSkies_mapPick',
+        JSON.stringify({
+          context: pickContext,
+          lat: pickedPoint.lat,
+          lng: pickedPoint.lng,
+          label: pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`,
+          ts: Date.now(),
+        })
+      );
+    } catch (e) {
+      console.error(e);
+    }
+    router.push(returnPath);
+  };
+
+  const cancelPick = () => {
+    router.push(returnPath);
+  };
+
+  // Navigate to next waypoint
+  const goToNextWaypoint = () => {
+    const nextIdx = currentWaypointIndex + 1;
+    if (nextIdx < waypointsList.length) {
+      setCurrentWaypointIndex(nextIdx);
+      const wp = waypointsList[nextIdx];
+      if (wp.lat && wp.lng) {
+        const dest = { lat: wp.lat, lng: wp.lng, label: wp.label || `Stop ${nextIdx + 1}` };
+        setDestination(dest);
+        setDestText(dest.label);
+        setFlyTo([dest.lat, dest.lng]);
+        // Route from current destination to next
+        if (destination) {
+          setOrigin(destination);
+          setOriginText(destination.label);
+        }
+      }
+    }
+  };
+
   // Get user's current location
   const getUserLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          if (pickMode) {
+            handlePickMapClick({ lat, lng });
+            return;
+          }
           const userLoc = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
+            lat,
+            lng,
             label: "Your Location"
           };
           setUserLocation(userLoc);
@@ -878,24 +1019,66 @@ const MapScreen = ({ venueCoords }) => {
         minWidth: 0,
         overflow: 'hidden',
         paddingLeft: '10px',
-        marginRight: nearbyPlaces.length > 0 ? '40px' : '0',
+        marginRight: !pickMode && nearbyPlaces.length > 0 ? '40px' : '0',
         pointerEvents: 'auto'
       }}>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', flexShrink: 0, zIndex: 2 }}>
-          <WeatherWidget location={weatherLocation} />
-
-          <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <SearchInput
-                  placeholder="From — origin location"
-                  value={originText}
-                  onChange={setOriginText}
-                  onSelect={handleOriginSelect}
-                  icon="🟦"
-                />
+          {pickMode ? (
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '14px 16px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', marginBottom: '8px' }}>
+                📍 Pin your {pickContext === 'activity' ? 'activity' : 'event'} location
+              </div>
+              <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px', lineHeight: 1.45 }}>
+                Tap anywhere on the map to place or move the pin. The address field will use this location.
+                {pickHintLabel ? (
+                  <span style={{ display: 'block', marginTop: '6px', fontSize: '11px', opacity: 0.85 }}>
+                    Hint: {pickHintLabel}
+                  </span>
+                ) : null}
+              </p>
+              {pickLoading && <div style={{ fontSize: '11px', color: '#718096', marginBottom: '8px' }}>Resolving address…</div>}
+              {pickedLabel && (
+                <div style={{ fontSize: '11px', color: '#2C5282', marginBottom: '10px', padding: '8px 10px', background: '#EBF8FF', borderRadius: '10px', maxHeight: '72px', overflowY: 'auto' }}>
+                  {pickedLabel}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
+                  type="button"
+                  onClick={confirmPick}
+                  disabled={!pickedPoint || pickLoading}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: !pickedPoint || pickLoading ? '#A0AEC0' : '#15A862',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: !pickedPoint || pickLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Use this location
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelPick}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #CBD5E0',
+                    background: 'white',
+                    color: '#4A5568',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
                   onClick={getUserLocation}
                   style={{
                     padding: '8px 12px',
@@ -905,58 +1088,92 @@ const MapScreen = ({ venueCoords }) => {
                     color: 'white',
                     cursor: 'pointer',
                     fontSize: '12px',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    marginLeft: 'auto',
                   }}
                 >
-                  My Location
+                  My location
                 </button>
               </div>
-
-              <SearchInput
-                placeholder="To — destination"
-                value={destText}
-                onChange={setDestText}
-                onSelect={handleDestSelect}
-                icon="🔴"
-              />
-
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {modeOptions.map(({ key, icon, label }) => (
-                  <button key={key} onClick={() => setRouteMode(key)} title={label}
-                    style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '15px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.12)' : 'scale(1)' }}
-                  >{icon}</button>
-                ))}
-                <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
-                  style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '13px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
-                >{isRouting ? 'Routing...' : 'Go'}</button>
-
-                {isRerouted && (
-                  <button onClick={undoReroute}
-                    style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FF9800', color: 'white', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}
-                  >
-                    Undo
-                  </button>
-                )}
-
-                {(origin || destination || routeCoords) && (
-                  <button onClick={clearAll} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>
-                )}
-              </div>
-
-              {routeError && <div style={{ fontSize: '12px', color: '#E53E3E', padding: '5px 10px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
-
-              {routeInfo && (
-                <div style={{ display: 'flex', gap: '12px', padding: '7px 12px', background: '#EBF8FF', borderRadius: '10px', fontSize: '12px', fontWeight: '700', color: '#2C5282' }}>
-                  <span>📏 {routeInfo.distance} km</span>
-                  <span>⏱ Base: {routeInfo.time} min</span>
-                  <span>⏱ Est: {routeInfo.adjustedTime} min</span>
-                </div>
-              )}
             </div>
-          </div>
+          ) : (
+            <>
+              <WeatherWidget location={weatherLocation} />
+
+              <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <SearchInput
+                      placeholder="From — origin location"
+                      value={originText}
+                      onChange={setOriginText}
+                      onSelect={handleOriginSelect}
+                      icon="🟦"
+                    />
+                    <button
+                      onClick={getUserLocation}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: '#2C5282',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      My Location
+                    </button>
+                  </div>
+
+                  <SearchInput
+                    placeholder="To — destination"
+                    value={destText}
+                    onChange={setDestText}
+                    onSelect={handleDestSelect}
+                    icon="🔴"
+                  />
+
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {modeOptions.map(({ key, icon, label }) => (
+                      <button key={key} onClick={() => setRouteMode(key)} title={label}
+                        style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '15px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.12)' : 'scale(1)' }}
+                      >{icon}</button>
+                    ))}
+                    <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
+                      style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '13px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
+                    >{isRouting ? 'Routing...' : 'Go'}</button>
+
+                    {isRerouted && (
+                      <button onClick={undoReroute}
+                        style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FF9800', color: 'white', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}
+                      >
+                        Undo
+                      </button>
+                    )}
+
+                    {(origin || destination || routeCoords) && (
+                      <button onClick={clearAll} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>
+                    )}
+                  </div>
+
+                  {routeError && <div style={{ fontSize: '12px', color: '#E53E3E', padding: '5px 10px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
+
+                  {routeInfo && (
+                    <div style={{ display: 'flex', gap: '12px', padding: '7px 12px', background: '#EBF8FF', borderRadius: '10px', fontSize: '12px', fontWeight: '700', color: '#2C5282' }}>
+                      <span>📏 {routeInfo.distance} km</span>
+                      <span>⏱ Base: {routeInfo.time} min</span>
+                      <span>⏱ Est: {routeInfo.adjustedTime} min</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {nearbyPlaces.length > 0 && !isRerouted && (
+        {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', zIndex: 2, flexShrink: 0 }}>
             <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '6px', color: '#666' }}>Filter places:</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -997,6 +1214,10 @@ const MapScreen = ({ venueCoords }) => {
             />
             {flyTo && <FlyTo coords={flyTo} />}
 
+            {pickMode && (
+              <MapPickClickHandler enabled={pickMode} onLatLngClick={handlePickMapClick} />
+            )}
+
             <MapControls
               onZoomIn={() => { }}
               onZoomOut={() => { }}
@@ -1004,15 +1225,25 @@ const MapScreen = ({ venueCoords }) => {
               onRoute={() => fetchRoute(origin || userLocation, destination, routeMode, false)}
             />
 
-            {userLocation && !origin && (
+            {pickMode && pickedPoint && (
+              <Marker position={[pickedPoint.lat, pickedPoint.lng]} icon={destIcon}>
+                <Popup>
+                  <strong>Pinned location</strong>
+                  <br />
+                  {pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`}
+                </Popup>
+              </Marker>
+            )}
+
+            {userLocation && !origin && !pickMode && (
               <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
                 <Popup><strong>Your Location</strong></Popup>
               </Marker>
             )}
 
-            {origin && <Marker position={[origin.lat, origin.lng]} icon={originIcon}><Popup><strong>Origin</strong><br />{origin.label}</Popup></Marker>}
+            {!pickMode && origin && <Marker position={[origin.lat, origin.lng]} icon={originIcon}><Popup><strong>Origin</strong><br />{origin.label}</Popup></Marker>}
 
-            {destination && <Marker position={[destination.lat, destination.lng]} icon={destIcon}>
+            {!pickMode && destination && <Marker position={[destination.lat, destination.lng]} icon={destIcon}>
               <Popup>
                 <strong>Destination</strong><br />
                 {destination.label}
@@ -1020,7 +1251,7 @@ const MapScreen = ({ venueCoords }) => {
               </Popup>
             </Marker>}
 
-            {routeSegments.map((segment, idx) => (
+            {!pickMode && routeSegments.map((segment, idx) => (
               <Polyline
                 key={idx}
                 positions={[segment.start, segment.end]}
@@ -1034,7 +1265,7 @@ const MapScreen = ({ venueCoords }) => {
               />
             ))}
 
-            {!isRerouted && getFilteredPlaces().map((place, idx) => (
+            {!pickMode && !isRerouted && getFilteredPlaces().map((place, idx) => (
               <Marker
                 key={idx}
                 position={[place.lat, place.lng]}
@@ -1085,7 +1316,114 @@ const MapScreen = ({ venueCoords }) => {
         </div>
       </div>
 
-      {nearbyPlaces.length > 0 && !isRerouted && (
+      {/* Itinerary Waypoints Panel */}
+      {!pickMode && waypointsList.length > 0 && (
+        <div style={{
+          width: '280px',
+          backgroundColor: '#EDE7F6',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          flexShrink: 0,
+          position: 'relative',
+          zIndex: 2,
+          overflowY: 'auto'
+        }}>
+          <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#4A148C', margin: '0 0 4px', textAlign: 'center' }}>
+            🗺️ Itinerary Navigation
+          </h3>
+          <p style={{ fontSize: '10px', color: '#6A1B9A', textAlign: 'center', margin: '0 0 8px', opacity: 0.8 }}>
+            Stop {currentWaypointIndex + 1} of {waypointsList.length}
+          </p>
+
+          {/* Progress dots */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+            {waypointsList.map((_, i) => (
+              <div key={i} style={{
+                width: i === currentWaypointIndex ? '20px' : '8px',
+                height: '8px',
+                borderRadius: '4px',
+                background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9',
+                transition: 'all 0.3s ease'
+              }}></div>
+            ))}
+          </div>
+
+          {/* Waypoints list */}
+          {waypointsList.map((wp, i) => (
+            <div key={i} style={{
+              backgroundColor: i === currentWaypointIndex ? 'white' : i < currentWaypointIndex ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)',
+              borderRadius: '12px',
+              padding: '10px',
+              border: i === currentWaypointIndex ? '2px solid #AB47BC' : '1px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              transition: 'all 0.2s',
+              opacity: i < currentWaypointIndex ? 0.6 : 1
+            }}>
+              <div style={{
+                width: '28px', height: '28px', borderRadius: '50%',
+                background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', fontWeight: '700', flexShrink: 0
+              }}>
+                {i < currentWaypointIndex ? '✓' : i + 1}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#1A365D', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {wp.label || wp.activityName || `Stop ${i + 1}`}
+                </div>
+                {wp.activityName && wp.label !== wp.activityName && (
+                  <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{wp.activityName}</div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Next Stop Button */}
+          {currentWaypointIndex < waypointsList.length - 1 && (
+            <button
+              onClick={goToNextWaypoint}
+              style={{
+                marginTop: '8px',
+                padding: '10px',
+                background: 'linear-gradient(135deg, #7B1FA2, #AB47BC)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '700',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              Next Stop →
+            </button>
+          )}
+
+          {currentWaypointIndex === waypointsList.length - 1 && (
+            <div style={{
+              marginTop: '8px',
+              padding: '10px',
+              background: '#E8F5E9',
+              borderRadius: '12px',
+              textAlign: 'center',
+              fontSize: '12px',
+              fontWeight: '700',
+              color: '#2E7D32'
+            }}>
+              ✅ Final Destination Reached
+            </div>
+          )}
+        </div>
+      )}
+      {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
         <div style={{
           width: '280px',
           backgroundColor: '#81D4FA',

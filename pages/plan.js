@@ -6,6 +6,9 @@ import { buildWeatherContext, detectScheduleConflicts } from '@/lib/aiContext';
 import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
 
+const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
+const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
+
 const MyEvents = () => {
   // --- 1. DATA STATE ---
   const [eventData, setEventData] = useState([]);
@@ -37,6 +40,7 @@ const MyEvents = () => {
 
   // --- 2. UI & LOCATION STATE ---
   const [activeFilter, setActiveFilter] = useState('All Events');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState('Locating...');
   const [currentDate, setCurrentDate] = useState('');
@@ -50,6 +54,7 @@ const MyEvents = () => {
   const [editingId, setEditingId] = useState(null);
   const [locationResults, setLocationResults] = useState([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Itinerary States
   const [isItineraryOpen, setIsItineraryOpen] = useState(false);
@@ -57,8 +62,13 @@ const MyEvents = () => {
   const [activities, setActivities] = useState([]);
   const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
   const [editingActivityId, setEditingActivityId] = useState(null);
-  const initialActivityForm = { activity_name: '', description: '', start_time: '', end_time: '', location: '' };
+  const initialActivityForm = { activity_name: '', description: '', start_time: '', end_time: '', location: '', latitude: null, longitude: null };
   const [activityForm, setActivityForm] = useState(initialActivityForm);
+  const [activityLocationResults, setActivityLocationResults] = useState([]);
+  const [isSearchingActivityLocation, setIsSearchingActivityLocation] = useState(false);
+
+  // Progress bar — completed activities tracked in localStorage
+  const [completedActivities, setCompletedActivities] = useState({});
 
   const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null };
   const [formData, setFormData] = useState(initialFormState);
@@ -70,6 +80,50 @@ const MyEvents = () => {
 
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
+
+  // --- STATUS HELPERS ---
+  const getEventStatus = (event) => {
+    const now = new Date();
+    const endDate = event.end_datetime ? new Date(event.end_datetime) : (event.date ? new Date(event.date + 'T23:59:59') : null);
+    const startDate = event.start_datetime ? new Date(event.start_datetime) : (event.date ? new Date(event.date + 'T00:00:00') : null);
+    if (!endDate && !startDate) return 'upcoming';
+    if (endDate && endDate < now) return 'done';
+    return 'upcoming';
+  };
+
+  const statusCounts = {
+    All: eventData.length,
+    Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
+    Done: eventData.filter(e => getEventStatus(e) === 'done').length,
+  };
+
+  // --- PROGRESS BAR HELPERS ---
+  const loadCompletedActivities = (eventId) => {
+    try {
+      const stored = localStorage.getItem(`itinerary_progress_${eventId}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  };
+
+  const saveCompletedActivities = (eventId, completed) => {
+    try {
+      localStorage.setItem(`itinerary_progress_${eventId}`, JSON.stringify(completed));
+    } catch (e) { console.error('Failed to save progress:', e); }
+  };
+
+  const toggleActivityComplete = (activityId) => {
+    if (!selectedEventForItinerary) return;
+    const eventId = selectedEventForItinerary.id;
+    const updated = { ...completedActivities, [activityId]: !completedActivities[activityId] };
+    setCompletedActivities(updated);
+    saveCompletedActivities(eventId, updated);
+  };
+
+  const getProgressPercent = () => {
+    if (activities.length === 0) return 0;
+    const doneCount = activities.filter(a => completedActivities[a.id]).length;
+    return Math.round((doneCount / activities.length) * 100);
+  };
 
   // --- 3. FETCH LOCATION & DATE & AUTH ---
   useEffect(() => {
@@ -111,14 +165,10 @@ const MyEvents = () => {
     setAiSuggestions([]);
 
     try {
-      // Detect conflicts locally
       const conflicts = detectScheduleConflicts(eventData);
-
-      // Get weather context
       const { lat, lon } = await getLocationWithFallback();
       const weatherCtx = await buildWeatherContext(lat, lon);
 
-      // Call AI endpoint
       const response = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,10 +185,8 @@ const MyEvents = () => {
       });
 
       const data = await response.json();
-
       const newSuggestions = [];
 
-      // Add conflict suggestions
       if (conflicts.length > 0) {
         conflicts.forEach(c => {
           newSuggestions.push({
@@ -150,34 +198,18 @@ const MyEvents = () => {
         });
       }
 
-      // Add AI analysis
       if (data.reply) {
-        newSuggestions.push({
-          type: 'ai',
-          icon: '✨',
-          title: 'AI Itinerary Analysis',
-          message: data.reply,
-        });
+        newSuggestions.push({ type: 'ai', icon: '✨', title: 'AI Itinerary Analysis', message: data.reply });
       }
 
       if (newSuggestions.length === 0) {
-        newSuggestions.push({
-          type: 'success',
-          icon: '✅',
-          title: 'All Good!',
-          message: 'No issues detected. Your schedule looks well-organized!',
-        });
+        newSuggestions.push({ type: 'success', icon: '✅', title: 'All Good!', message: 'No issues detected. Your schedule looks well-organized!' });
       }
 
       setAiSuggestions(newSuggestions);
     } catch (err) {
       console.error('AI analysis failed:', err);
-      setAiSuggestions([{
-        type: 'warning',
-        icon: '⚠️',
-        title: 'Analysis Unavailable',
-        message: 'Could not complete the analysis. Please try again.',
-      }]);
+      setAiSuggestions([{ type: 'warning', icon: '⚠️', title: 'Analysis Unavailable', message: 'Could not complete the analysis. Please try again.' }]);
     }
 
     setIsAiLoading(false);
@@ -192,8 +224,23 @@ const MyEvents = () => {
   const handleOpenAddForm = () => {
     setFormData(initialFormState);
     setEditingId(null);
+    setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
+  };
+
+  // Convert a TIMESTAMPTZ ISO string from Supabase to local datetime-local value
+  const isoToLocalInput = (isoStr) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    // Format as YYYY-MM-DDTHH:MM in local time
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const handleOpenEditForm = (event) => {
@@ -204,12 +251,13 @@ const MyEvents = () => {
       date: event.date,
       category: event.category || 'Food',
       venue: event.venue || '',
-      start_datetime: event.start_datetime ? event.start_datetime.slice(0, 16) : '',
-      end_datetime: event.end_datetime ? event.end_datetime.slice(0, 16) : '',
+      start_datetime: isoToLocalInput(event.start_datetime),
+      end_datetime: isoToLocalInput(event.end_datetime),
       latitude: event.latitude || null,
       longitude: event.longitude || null
     });
     setEditingId(event.id);
+    setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
   };
@@ -224,6 +272,31 @@ const MyEvents = () => {
   const handleSaveEvent = async (e) => {
     e.preventDefault();
     if (!userId) return;
+    setFormError('');
+
+    // --- Validation: minimum 5 hours in advance ---
+    if (formData.start_datetime) {
+      const startTime = new Date(formData.start_datetime);
+      const now = new Date();
+      const fiveHoursFromNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+
+      if (startTime < now) {
+        setFormError('❌ Cannot create an event in the past. Please choose a future date and time.');
+        return;
+      }
+
+      if (!editingId && startTime < fiveHoursFromNow) {
+        setFormError('⏰ Event must be at least 5 hours from now. Please choose a later time.');
+        return;
+      }
+    }
+
+    if (formData.end_datetime && formData.start_datetime) {
+      if (new Date(formData.end_datetime) <= new Date(formData.start_datetime)) {
+        setFormError('❌ End time must be after start time.');
+        return;
+      }
+    }
 
     const newEventData = {
       title: formData.title,
@@ -233,8 +306,8 @@ const MyEvents = () => {
       category: formData.category,
       user_id: userId,
       venue: formData.venue || null,
-      start_datetime: formData.start_datetime || null,
-      end_datetime: formData.end_datetime || null,
+      start_datetime: formData.start_datetime ? new Date(formData.start_datetime).toISOString() : null,
+      end_datetime: formData.end_datetime ? new Date(formData.end_datetime).toISOString() : null,
       latitude: formData.latitude || null,
       longitude: formData.longitude || null
     };
@@ -283,6 +356,34 @@ const MyEvents = () => {
     setLocationResults([]);
   };
 
+  const handleActivityLocationSearch = async (val) => {
+    setActivityForm({ ...activityForm, location: val, latitude: null, longitude: null });
+    if (val.length > 2) {
+      setIsSearchingActivityLocation(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=5`);
+        const data = await res.json();
+        setActivityLocationResults(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearchingActivityLocation(false);
+      }
+    } else {
+      setActivityLocationResults([]);
+    }
+  };
+
+  const handleSelectActivityLocation = (loc) => {
+    setActivityForm({
+      ...activityForm,
+      location: loc.display_name,
+      latitude: parseFloat(loc.lat),
+      longitude: parseFloat(loc.lon)
+    });
+    setActivityLocationResults([]);
+  };
+
   // --- 5. ITINERARY LOGIC ---
   const handleOpenItinerary = async (event) => {
     setSelectedEventForItinerary(event);
@@ -290,6 +391,8 @@ const MyEvents = () => {
     setIsActivityFormOpen(false);
     setEditingActivityId(null);
     setActivityForm(initialActivityForm);
+    const loaded = loadCompletedActivities(event.id);
+    setCompletedActivities(loaded);
     await fetchActivities(event.id);
   };
 
@@ -304,14 +407,146 @@ const MyEvents = () => {
     }
   };
 
+  const openMapPickerForEvent = () => {
+    try {
+      sessionStorage.setItem(PLAN_RESTORE_STORAGE_KEY, JSON.stringify({
+        type: 'event',
+        formDataSnapshot: formData,
+        editingId,
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+    const params = new URLSearchParams({ pick: '1', from: 'event', returnTo: '/plan' });
+    if (formData.latitude != null && formData.longitude != null) {
+      params.set('lat', String(formData.latitude));
+      params.set('lng', String(formData.longitude));
+    }
+    if (formData.location) params.set('label', formData.location);
+    router.push(`/map?${params.toString()}`);
+  };
+
+  const openMapPickerForActivity = () => {
+    if (!selectedEventForItinerary) return;
+    try {
+      sessionStorage.setItem(PLAN_RESTORE_STORAGE_KEY, JSON.stringify({
+        type: 'activity',
+        itineraryEventId: selectedEventForItinerary.id,
+        activityFormSnapshot: activityForm,
+        editingActivityId,
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+    const params = new URLSearchParams({ pick: '1', from: 'activity', returnTo: '/plan' });
+    if (activityForm.latitude != null && activityForm.longitude != null) {
+      params.set('lat', String(activityForm.latitude));
+      params.set('lng', String(activityForm.longitude));
+    }
+    if (activityForm.location) params.set('label', activityForm.location);
+    router.push(`/map?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !userId) return;
+    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
+    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
+    if (!restoreRaw && !pickRaw) return;
+
+    if (restoreRaw) {
+      try {
+        const restore = JSON.parse(restoreRaw);
+        if (restore.type === 'event') {
+          sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
+          setFormData(restore.formDataSnapshot);
+          setEditingId(restore.editingId ?? null);
+          setIsFormOpen(true);
+        }
+      } catch {
+        sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
+      }
+    }
+
+    if (pickRaw) {
+      try {
+        const mapPick = JSON.parse(pickRaw);
+        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
+          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          return;
+        }
+        if (mapPick.context !== 'activity') {
+          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          setFormData(prev => ({
+            ...prev,
+            location: mapPick.label || prev.location,
+            latitude: mapPick.lat,
+            longitude: mapPick.lng,
+          }));
+        }
+      } catch {
+        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+      }
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !userId || eventData.length === 0) return;
+    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
+    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
+    if (!restoreRaw && !pickRaw) return;
+
+    if (restoreRaw) {
+      try {
+        const restore = JSON.parse(restoreRaw);
+        if (restore.type === 'activity' && restore.itineraryEventId) {
+          const ev = eventData.find(e => e.id === restore.itineraryEventId);
+          if (ev) {
+            sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
+            setSelectedEventForItinerary(ev);
+            setIsItineraryOpen(true);
+            setActivityForm(restore.activityFormSnapshot || initialActivityForm);
+            setIsActivityFormOpen(true);
+            setEditingActivityId(restore.editingActivityId ?? null);
+            fetchActivities(restore.itineraryEventId);
+          }
+        }
+      } catch {
+        sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
+      }
+    }
+
+    if (pickRaw) {
+      try {
+        const mapPick = JSON.parse(pickRaw);
+        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
+          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          return;
+        }
+        if (mapPick.context === 'activity') {
+          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          setActivityForm(prev => ({
+            ...prev,
+            location: mapPick.label || prev.location,
+            latitude: mapPick.lat,
+            longitude: mapPick.lng,
+          }));
+        }
+      } catch {
+        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+      }
+    }
+  }, [userId, eventData]);
+
   const handleOpenActivityForm = (activity = null) => {
     if (activity) {
       setActivityForm({
         activity_name: activity.activity_name,
         description: activity.description || '',
-        start_time: activity.start_time ? activity.start_time.slice(0, 16) : '',
-        end_time: activity.end_time ? activity.end_time.slice(0, 16) : '',
-        location: activity.location || ''
+        start_time: isoToLocalInput(activity.start_time),
+        end_time: isoToLocalInput(activity.end_time),
+        location: activity.location || '',
+        latitude: activity.latitude || null,
+        longitude: activity.longitude || null
       });
       setEditingActivityId(activity.id);
     } else {
@@ -319,20 +554,39 @@ const MyEvents = () => {
       setEditingActivityId(null);
     }
     setIsActivityFormOpen(true);
+    setActivityLocationResults([]);
   };
 
   const handleSaveActivity = async (e) => {
     e.preventDefault();
     if (!userId || !selectedEventForItinerary) return;
 
+    // Validation: Check if activity times are within event times
+    const eventStart = new Date(selectedEventForItinerary.start_datetime);
+    const eventEnd = new Date(selectedEventForItinerary.end_datetime);
+    const activityStart = new Date(activityForm.start_time);
+    const activityEnd = new Date(activityForm.end_time);
+
+    if (activityStart < eventStart || activityEnd > eventEnd) {
+      alert("Activity start and end times must be within the event's start and end times.");
+      return;
+    }
+
+    if (activityStart >= activityEnd) {
+      alert("Activity end time must be after the start time.");
+      return;
+    }
+
     const activityData = {
       event_id: selectedEventForItinerary.id,
       user_id: userId,
       activity_name: activityForm.activity_name,
       description: activityForm.description || null,
-      start_time: activityForm.start_time,
-      end_time: activityForm.end_time,
+      start_time: activityForm.start_time ? new Date(activityForm.start_time).toISOString() : null,
+      end_time: activityForm.end_time ? new Date(activityForm.end_time).toISOString() : null,
       location: activityForm.location || null,
+      latitude: activityForm.latitude,
+      longitude: activityForm.longitude,
       sort_order: activities.length
     };
 
@@ -367,6 +621,7 @@ const MyEvents = () => {
     }
   };
 
+  // --- NAVIGATION ---
   const handleNavigateToVenue = (event) => {
     if (event.latitude && event.longitude) {
       router.push(`/map?lat=${event.latitude}&lng=${event.longitude}&label=${encodeURIComponent(event.venue || event.location)}`);
@@ -375,13 +630,50 @@ const MyEvents = () => {
     }
   };
 
+  // Multi-waypoint: event venue first, then activity locations
+  const handleNavigateItinerary = (event, activitiesList) => {
+    const waypoints = [];
+
+    // First waypoint: the event venue itself
+    if (event.latitude && event.longitude) {
+      waypoints.push({
+        lat: parseFloat(event.latitude),
+        lng: parseFloat(event.longitude),
+        label: event.venue || event.location || 'Event Venue'
+      });
+    }
+
+    // Subsequent waypoints: activity locations
+    activitiesList.forEach(a => {
+      if (a.location && a.location.trim()) {
+        if (a.latitude && a.longitude) {
+          waypoints.push({
+            lat: parseFloat(a.latitude),
+            lng: parseFloat(a.longitude),
+            label: a.location,
+            activityName: a.activity_name
+          });
+        } else {
+          waypoints.push({ label: a.location, activityName: a.activity_name });
+        }
+      }
+    });
+
+    if (waypoints.length > 0) {
+      router.push(`/map?waypoints=${encodeURIComponent(JSON.stringify(waypoints))}`);
+    } else {
+      router.push(`/map`);
+    }
+  };
+
   // --- 6. FILTER & SEARCH ---
   const filteredEvents = eventData.filter(event => {
-    const matchesFilter = activeFilter === 'All Events' ||
+    const matchesCategory = activeFilter === 'All Events' ||
       event.tags.some(tag => tag.label.toLowerCase().includes(activeFilter.toLowerCase()));
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.location.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
+    const matchesStatus = statusFilter === 'All' || getEventStatus(event) === statusFilter.toLowerCase();
+    return matchesCategory && matchesSearch && matchesStatus;
   });
 
   // --- 7. CALENDAR GENERATION ---
@@ -421,12 +713,11 @@ const MyEvents = () => {
     return { dateStr, startTime, endTime };
   };
 
+  const progressPercent = getProgressPercent();
+
   return (
     <div className={styles.appContainer}>
 
-      {/* This wrapper guarantees the Sidebar (and its mobile downbar) 
-        sits entirely on top of the main content 
-      */}
       <div style={{ position: 'relative', zIndex: 9999 }}>
         <Sidebar />
       </div>
@@ -460,19 +751,49 @@ const MyEvents = () => {
           </div>
         </header>
 
-        {/* Filter Bar */}
-        <div className={styles.filterBar}>
-          {categories.map(cat => (
+        {/* Status Filter Tabs */}
+        <div className={styles.statusFilterBar}>
+          {['All', 'Upcoming', 'Done'].map(status => (
             <button
-              key={cat}
-              className={`${styles.filterBtn} ${activeFilter === cat ? styles.activeFilter : ''}`}
-              onClick={() => setActiveFilter(cat)}
+              key={status}
+              className={`${styles.statusBtn} ${statusFilter === status ? styles.statusBtnActive : ''}`}
+              onClick={() => setStatusFilter(status)}
             >
-              {cat}
+              {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
+              <span className={styles.statusCount}>{statusCounts[status]}</span>
             </button>
           ))}
+        </div>
 
-          {/* Action Group (Desktop Only) */}
+        {/* Filter Bar */}
+        <div className={styles.filterBar}>
+          {/* Desktop: category buttons */}
+          <div className={styles.filterBtnsDesktop}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                className={`${styles.filterBtn} ${activeFilter === cat ? styles.activeFilter : ''}`}
+                onClick={() => setActiveFilter(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile: category dropdown */}
+          <div className={styles.filterDropdownMobile}>
+            <select
+              className={styles.mobileSelect}
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Action Group */}
           <div className={styles.actionGroup}>
             <button className={styles.actionBtn} onClick={() => setIsCalendarOpen(true)}>
               <span style={{ fontSize: '14px', color: '#76b5d9' }}>📅</span> Calendar
@@ -497,7 +818,6 @@ const MyEvents = () => {
           </div>
         </div>
 
-        {/* Event List */}
         {/* AI Suggestions Panel */}
         {showAiPanel && aiSuggestions.length > 0 && (
           <section style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
@@ -514,21 +834,14 @@ const MyEvents = () => {
               <div key={i} style={{
                 background: s.type === 'warning' ? 'rgba(237, 137, 54, 0.08)' : s.type === 'success' ? 'rgba(72, 187, 120, 0.08)' : 'rgba(102, 126, 234, 0.08)',
                 border: `1px solid ${s.type === 'warning' ? 'rgba(237, 137, 54, 0.25)' : s.type === 'success' ? 'rgba(72, 187, 120, 0.25)' : 'rgba(102, 126, 234, 0.2)'}`,
-                borderRadius: '12px',
-                padding: '12px 14px',
-                position: 'relative',
+                borderRadius: '12px', padding: '12px 14px', position: 'relative',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <span style={{ fontSize: '16px' }}>{s.icon}</span>
                   <strong style={{ fontSize: '13px', color: '#2d3748' }}>{s.title}</strong>
-                  <button
-                    onClick={() => dismissSuggestion(i)}
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '14px' }}
-                  >✕</button>
+                  <button onClick={() => dismissSuggestion(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '14px' }}>✕</button>
                 </div>
-                <div style={{ fontSize: '12.5px', color: '#4a5568', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                  {s.message}
-                </div>
+                <div style={{ fontSize: '12.5px', color: '#4a5568', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{s.message}</div>
               </div>
             ))}
           </section>
@@ -547,114 +860,100 @@ const MyEvents = () => {
           </div>
         )}
 
+        {/* Event List */}
         <section className={styles.eventList}>
           {filteredEvents.length === 0 ? (
-            <div className={styles.emptyState}>No events found. Click "Add" to create one!</div>
+            <div className={styles.emptyState}>
+              {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+            </div>
           ) : (
-            filteredEvents.map(event => (
-              <div key={event.id} className={styles.eventCard}>
-                <div className={styles.cardLeftBorder} style={{ backgroundColor: event.typeColor }}></div>
-                <div className={styles.cardBody}>
-                  <div className={styles.eventInfo}>
-                    <div className={styles.avatar}>
-                      {event.title.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div className={styles.details}>
-                      <h3>{event.title}</h3>
-                      <p>{event.location} • {event.price}</p>
+            filteredEvents.map(event => {
+              const status = getEventStatus(event);
+              return (
+                <div key={event.id} className={styles.eventCard} style={{ position: 'relative' }}>
+                  <div className={styles.cardLeftBorder} style={{ backgroundColor: event.typeColor }}></div>
 
-                      {/* Enhanced meta info */}
-                      <div className={styles.eventMeta}>
-                        {event.venue && <span>🏛️ {event.venue}</span>}
-                        {event.start_datetime ? (
-                          <span>📅 {formatDateTime(event.start_datetime)}</span>
-                        ) : event.date ? (
-                          <span>📅 {event.date}</span>
-                        ) : null}
-                        {event.end_datetime && <span>→ {formatTime(event.end_datetime)}</span>}
+                  {/* Status Badge */}
+                  <span
+                    className={styles.cardStatusBadge}
+                    style={{
+                      background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                      color: status === 'done' ? '#15A862' : '#4396D1'
+                    }}
+                  >
+                    {status === 'done' ? '✅ Done' : '🔜 Upcoming'}
+                  </span>
+
+                  <div className={styles.cardBody}>
+                    <div className={styles.eventInfo}>
+                      <div className={styles.avatar}>
+                        {event.title.substring(0, 2).toUpperCase()}
                       </div>
+                      <div className={styles.details}>
+                        <h3>{event.title}</h3>
+                        <p>{event.location} • {event.price}</p>
 
-                      <div className={styles.tagRow}>
-                        {event.tags.map((tag, index) => (
-                          <span key={index} className={`${styles.tag} ${tag.styleClass}`}>
-                            {tag.label}
-                          </span>
-                        ))}
-                      </div>
-
-                      {event.aiSuggestion && (
-                        <div className={styles.tagRow}>
-                          <div className={styles.aiBox}>{event.aiSuggestion}</div>
+                        {/* Enhanced meta info */}
+                        <div className={styles.eventMeta}>
+                          {event.venue && <span>🏛️ {event.venue}</span>}
+                          {event.start_datetime ? (
+                            <span>📅 {formatDateTime(event.start_datetime)}</span>
+                          ) : event.date ? (
+                            <span>📅 {event.date}</span>
+                          ) : null}
+                          {event.end_datetime && <span>→ {formatTime(event.end_datetime)}</span>}
                         </div>
-                      )}
 
-                      {/* Itinerary & Navigate Buttons */}
-                      <div className={styles.cardBtnRow}>
-                        <button
-                          className={styles.itineraryBtn}
-                          onClick={() => handleOpenItinerary(event)}
-                        >
-                          📋 Itinerary
-                        </button>
-                        {(event.latitude && event.longitude) && (
-                          <button
-                            className={styles.navigateBtn}
-                            onClick={() => handleNavigateToVenue(event)}
-                          >
-                            🧭 Navigate
-                          </button>
+                        <div className={styles.tagRow}>
+                          {event.tags.map((tag, index) => (
+                            <span key={index} className={`${styles.tag} ${tag.styleClass}`}>
+                              {tag.label}
+                            </span>
+                          ))}
+                        </div>
+
+                        {event.aiSuggestion && (
+                          <div className={styles.tagRow}>
+                            <div className={styles.aiBox}>{event.aiSuggestion}</div>
+                          </div>
                         )}
+
+                        {/* Itinerary & Navigate Buttons */}
+                        <div className={styles.cardBtnRow}>
+                          <button
+                            className={styles.itineraryBtn}
+                            onClick={() => handleOpenItinerary(event)}
+                          >
+                            📋 Itinerary
+                          </button>
+                          {(event.latitude && event.longitude) ? (
+                            <button
+                              className={styles.navigateBtn}
+                              onClick={() => handleNavigateToVenue(event)}
+                            >
+                              🧭 Navigate
+                            </button>
+                          ) : (
+                            <span className={styles.locationHint}>📍 Select location from search to enable navigation</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Conditionally Render Edit/Delete Actions */}
-                {isEditListMode && (
-                  <div className={styles.cardActions}>
-                    <button onClick={() => handleOpenEditForm(event)} className={styles.iconBtnEdit}>✎</button>
-                    <button onClick={() => handleDeleteEvent(event.id)} className={styles.iconBtnDelete}>🗑</button>
-                  </div>
-                )}
-              </div>
-            ))
+                  {/* Conditionally Render Edit/Delete Actions */}
+                  {isEditListMode && (
+                    <div className={styles.cardActions}>
+                      <button onClick={() => handleOpenEditForm(event)} className={styles.iconBtnEdit}>✎</button>
+                      <button onClick={() => handleDeleteEvent(event.id)} className={styles.iconBtnDelete}>🗑</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </section>
-      </main> {/* THIS IS WHERE THE MAIN TAG MUST CLOSE */}
-
-      {/* --- MOBILE FLOATING ACTION PILL (Now completely outside of main content) --- */}
-      {/*<div className={styles.mobileFloatingActions}>
-        {/* Edit Button */}
-      {/*<button 
-          className={`${styles.mobileActionBtn} ${isEditListMode ? styles.activeEdit : ''}`}
-          onClick={() => setIsEditListMode(!isEditListMode)}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-        </button>*/}
-
-      {/* Add Button */}
-      {/* <button className={styles.mobileActionBtn} onClick={handleOpenAddForm}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-        </button>
-
-        {/* Calendar Button */}
-      {/*<button className={styles.mobileActionBtn} onClick={() => setIsCalendarOpen(true)}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-            <path d="M9 16l2 2 4-4"></path>
-          </svg>
-        </button>
-      </div>
+      </main>
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
       {isFormOpen && (
@@ -684,11 +983,33 @@ const MyEvents = () => {
                     <div className={styles.autocompleteDropdown} style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ddd', zIndex: 10, maxHeight: '150px', overflowY: 'auto', borderRadius: '4px' }}>
                       {locationResults.map((loc, i) => (
                         <div key={i} onClick={() => handleSelectLocation(loc)} style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee', color: 'black', fontSize: '12px' }}>
-                          {loc.display_name}
+                          📍 {loc.display_name}
                         </div>
                       ))}
                     </div>
                   )}
+                  {formData.latitude && formData.longitude && (
+                    <div style={{ fontSize: '10px', color: '#15A862', marginTop: '4px', fontWeight: 600 }}>
+                      ✅ Coordinates captured — navigation enabled
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={openMapPickerForEvent}
+                    style={{
+                      marginTop: '8px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      border: '1px solid #2C5282',
+                      background: 'white',
+                      color: '#2C5282',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🗺️ Pick on map
+                  </button>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Price / Cost</label>
@@ -719,6 +1040,25 @@ const MyEvents = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Validation Error */}
+              {formError && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '10px',
+                  color: '#DC2626',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  animation: 'modalPopUp 0.2s ease'
+                }}>
+                  {formError}
+                </div>
+              )}
 
               <div className={styles.formFooter}>
                 <button type="button" className={styles.btnCancel} onClick={() => setIsFormOpen(false)}>Cancel</button>
@@ -778,11 +1118,22 @@ const MyEvents = () => {
                     );
                   })()}
                   {selectedEventForItinerary.location && (
-                    <div className={styles.venueInfoItem}>
+                    <div
+                      className={styles.venueInfoItem}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        if (selectedEventForItinerary.latitude && selectedEventForItinerary.longitude) {
+                          router.push(`/map?lat=${selectedEventForItinerary.latitude}&lng=${selectedEventForItinerary.longitude}&label=${encodeURIComponent(selectedEventForItinerary.location)}`);
+                        } else {
+                          router.push(`/map?label=${encodeURIComponent(selectedEventForItinerary.location)}`);
+                        }
+                      }}
+                      title="Navigate to this address"
+                    >
                       <span className={styles.infoIcon}>📍</span>
                       <div>
                         <span className={styles.infoLabel}>Address</span>
-                        <span className={styles.infoValue}>{selectedEventForItinerary.location}</span>
+                        <span className={styles.infoValue}>{selectedEventForItinerary.location} <span style={{ fontSize: '10px', opacity: 0.7 }}>→ Navigate</span></span>
                       </div>
                     </div>
                   )}
@@ -790,8 +1141,27 @@ const MyEvents = () => {
               </div>
             </div>
 
-            {/* Body — Timeline */}
+            {/* Body — Progress Bar + Timeline */}
             <div className={styles.itineraryBody}>
+
+              {/* Progress Bar */}
+              {activities.length > 0 && (
+                <div className={styles.progressContainer}>
+                  <div className={styles.progressHeader}>
+                    <span className={styles.progressLabel}>
+                      {activities.filter(a => completedActivities[a.id]).length} of {activities.length} activities completed
+                    </span>
+                    <span className={styles.progressPercent}>{progressPercent}%</span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div
+                      className={`${styles.progressFill} ${progressPercent === 100 ? styles.progressComplete : ''}`}
+                      style={{ width: `${progressPercent}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
               {activities.length === 0 && !isActivityFormOpen ? (
                 <div className={styles.emptyItinerary}>
                   <span className={styles.emptyIcon}>📋</span>
@@ -800,29 +1170,52 @@ const MyEvents = () => {
                 </div>
               ) : (
                 <div className={styles.timeline}>
-                  {activities.map((activity, idx) => (
-                    <div key={activity.id} className={styles.timelineItem} style={{ animationDelay: `${idx * 0.05}s` }}>
-                      <div className={styles.timelineDot}></div>
-                      <div className={styles.activityCard}>
-                        <div className={styles.activityTime}>
-                          <span className={styles.timeBadge}>{formatTime(activity.start_time)}</span>
-                          <span>→</span>
-                          <span className={styles.timeBadge}>{formatTime(activity.end_time)}</span>
-                        </div>
-                        <div className={styles.activityName}>{activity.activity_name}</div>
-                        {activity.description && (
-                          <div className={styles.activityDesc}>{activity.description}</div>
-                        )}
-                        {activity.location && (
-                          <div className={styles.activityLocation}>📍 {activity.location}</div>
-                        )}
-                        <div className={styles.activityActions}>
-                          <button onClick={() => handleOpenActivityForm(activity)}>✎ Edit</button>
-                          <button className={styles.deleteActBtn} onClick={() => handleDeleteActivity(activity.id)}>🗑 Delete</button>
+                  {activities.map((activity, idx) => {
+                    const isDone = !!completedActivities[activity.id];
+                    return (
+                      <div key={activity.id} className={styles.timelineItem} style={{ animationDelay: `${idx * 0.05}s` }}>
+                        <div className={styles.timelineDot} style={isDone ? { background: '#15A862', boxShadow: '0 0 0 2px #15A862' } : {}}></div>
+                        <div className={`${styles.activityCard} ${isDone ? styles.activityDone : ''}`}>
+                          <div className={styles.activityCheckRow}>
+                            <div
+                              className={`${styles.activityCheckbox} ${isDone ? styles.activityChecked : ''}`}
+                              onClick={() => toggleActivityComplete(activity.id)}
+                              title={isDone ? 'Mark as incomplete' : 'Mark as complete'}
+                            ></div>
+                            <div style={{ flex: 1 }}>
+                              <div className={styles.activityTime}>
+                                <span className={styles.timeBadge}>{formatTime(activity.start_time)}</span>
+                                <span>→</span>
+                                <span className={styles.timeBadge}>{formatTime(activity.end_time)}</span>
+                              </div>
+                              <div className={styles.activityName}>{activity.activity_name}</div>
+                            </div>
+                          </div>
+                          {activity.description && (
+                            <div className={styles.activityDesc}>{activity.description}</div>
+                          )}
+                          {activity.location && (
+                            <div
+                              className={styles.activityLocation}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => {
+                                if (activity.latitude && activity.longitude) {
+                                  router.push(`/map?lat=${activity.latitude}&lng=${activity.longitude}&label=${encodeURIComponent(activity.location)}`);
+                                } else {
+                                  router.push(`/map?label=${encodeURIComponent(activity.location)}`);
+                                }
+                              }}
+                              title="Navigate to this location"
+                            >📍 {activity.location} <span style={{ fontSize: '10px', opacity: 0.7 }}>→ Navigate</span></div>
+                          )}
+                          <div className={styles.activityActions}>
+                            <button onClick={() => handleOpenActivityForm(activity)}>✎ Edit</button>
+                            <button className={styles.deleteActBtn} onClick={() => handleDeleteActivity(activity.id)}>🗑 Delete</button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -834,48 +1227,54 @@ const MyEvents = () => {
                     <div className={styles.activityFormGrid}>
                       <div className={styles.fullWidth}>
                         <label>Activity Name *</label>
-                        <input
-                          required
-                          type="text"
-                          value={activityForm.activity_name}
-                          onChange={e => setActivityForm({ ...activityForm, activity_name: e.target.value })}
-                          placeholder="e.g. Opening Speech"
-                        />
+                        <input required type="text" value={activityForm.activity_name} onChange={e => setActivityForm({ ...activityForm, activity_name: e.target.value })} placeholder="e.g. Opening Speech" />
                       </div>
                       <div>
                         <label>Start Time *</label>
-                        <input
-                          required
-                          type="datetime-local"
-                          value={activityForm.start_time}
-                          onChange={e => setActivityForm({ ...activityForm, start_time: e.target.value })}
-                        />
+                        <input required type="datetime-local" value={activityForm.start_time} onChange={e => setActivityForm({ ...activityForm, start_time: e.target.value })} min={isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
                       </div>
                       <div>
                         <label>End Time *</label>
-                        <input
-                          required
-                          type="datetime-local"
-                          value={activityForm.end_time}
-                          onChange={e => setActivityForm({ ...activityForm, end_time: e.target.value })}
-                        />
+                        <input required type="datetime-local" value={activityForm.end_time} onChange={e => setActivityForm({ ...activityForm, end_time: e.target.value })} min={activityForm.start_time || isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
                       </div>
                       <div className={styles.fullWidth}>
                         <label>Description</label>
-                        <textarea
-                          value={activityForm.description}
-                          onChange={e => setActivityForm({ ...activityForm, description: e.target.value })}
-                          placeholder="Brief description of the activity..."
-                        />
+                        <textarea value={activityForm.description} onChange={e => setActivityForm({ ...activityForm, description: e.target.value })} placeholder="Brief description of the activity..." />
                       </div>
-                      <div className={styles.fullWidth}>
+                      <div className={styles.fullWidth} style={{ position: 'relative' }}>
                         <label>Location</label>
-                        <input
-                          type="text"
-                          value={activityForm.location}
-                          onChange={e => setActivityForm({ ...activityForm, location: e.target.value })}
-                          placeholder="e.g. Main Hall, Room 201"
-                        />
+                        <input type="text" value={activityForm.location} onChange={e => handleActivityLocationSearch(e.target.value)} placeholder="e.g. Main Hall, Room 201" />
+                        {activityLocationResults.length > 0 && (
+                          <div className={styles.autocompleteDropdown} style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ddd', zIndex: 10, maxHeight: '150px', overflowY: 'auto', borderRadius: '4px' }}>
+                            {activityLocationResults.map((loc, i) => (
+                              <div key={i} onClick={() => handleSelectActivityLocation(loc)} style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee', color: 'black', fontSize: '12px' }}>
+                                📍 {loc.display_name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {activityForm.latitude && activityForm.longitude && (
+                          <div style={{ fontSize: '10px', color: '#15A862', marginTop: '4px', fontWeight: 600 }}>
+                            ✅ Coordinates captured — navigation enabled
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={openMapPickerForActivity}
+                          style={{
+                            marginTop: '8px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '8px',
+                            border: '1px solid #2C5282',
+                            background: 'white',
+                            color: '#2C5282',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          🗺️ Pick on map
+                        </button>
                       </div>
                     </div>
                     <div className={styles.activityFormFooter}>
@@ -894,11 +1293,22 @@ const MyEvents = () => {
             {/* Footer */}
             <div className={styles.itineraryFooter}>
               <span className={styles.activityCount}>{activities.length} activit{activities.length === 1 ? 'y' : 'ies'}</span>
-              {(selectedEventForItinerary.latitude && selectedEventForItinerary.longitude) && (
-                <button className={styles.navigateBtnLg} onClick={() => handleNavigateToVenue(selectedEventForItinerary)}>
-                  🧭 Navigate to Venue
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(selectedEventForItinerary.latitude && selectedEventForItinerary.longitude) && (
+                  <button className={styles.navigateBtnLg} onClick={() => handleNavigateToVenue(selectedEventForItinerary)}>
+                    🧭 Navigate to Venue
+                  </button>
+                )}
+                {activities.length > 0 && (
+                  <button
+                    className={styles.navigateBtnLg}
+                    style={{ background: 'linear-gradient(135deg, #6D7DB9, #8B5CF6)' }}
+                    onClick={() => handleNavigateItinerary(selectedEventForItinerary, activities)}
+                  >
+                    🗺️ Navigate Full Itinerary
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
