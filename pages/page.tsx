@@ -8,7 +8,7 @@ import {
   LuPhone, 
   LuCamera, 
   LuSettings,
-  LuEdit
+  LuPencil
 } from 'react-icons/lu';
 
 export default function ProfilePage() {
@@ -48,7 +48,7 @@ export default function ProfilePage() {
               {/* Action Buttons */}
               <div className="flex space-x-3 pb-2">
                 <button className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-                  <LuEdit className="w-4 h-4 mr-2" />
+                  <LuPencil className="w-4 h-4 mr-2" />
                   Edit Profile
                 </button>
                 <button className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors shadow-sm">

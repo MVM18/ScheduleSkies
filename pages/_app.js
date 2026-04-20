@@ -1,4 +1,6 @@
 import Head from 'next/head'
+import { useRouter } from 'next/router'
+import AiAssistant from '@/components/AiAssistant'
 
 // global styles must be imported only once in the custom App
 import '../styles/globals.css'
@@ -7,8 +9,15 @@ import '../styles/hero.css'
 import '../styles/features.css'
 import '../styles/plan.css'
 import '../styles/dashboard.css'
+import '../styles/loading.css';
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter()
+
+  // Hide AI assistant on login and signup pages
+  const hideAiPages = ['/login', '/signup']
+  const showAi = !hideAiPages.includes(router.pathname)
+
   return (
     <>
       <Head>
@@ -19,6 +28,7 @@ export default function App({ Component, pageProps }) {
         <link rel="icon" href="/images/logo.png" />
       </Head>
       <Component {...pageProps} />
+      {showAi && <AiAssistant />}
     </>
   )
 }

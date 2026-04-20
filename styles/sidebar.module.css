@@ -8,13 +8,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem 0;
+  justify-content: flex-start;
   gap: 2rem;
 }
 
 .logo img {
   width: 40px;
   height: 40px;
+  margin-top: 1rem;
 }
 
 .nav ul {
@@ -27,7 +28,7 @@
 }
 
 .nav a {
-  color: #ecf0f1;
+  color: #000;
   font-size: 1.5rem;
   display: flex;
   align-items: center;
@@ -38,6 +39,99 @@
   color: #3498db;
 }
 
+.icon {
+  width: 30px;
+  height: 30px;
+}
+
+.icon path {
+  fill: #000;
+}
+
+.active {
+  background-color: #FFF4D840;
+}
+
+.active .icon path {
+  fill: #fff;
+}
+
+.quickMenuContainer {
+  margin-top: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.quickMenuBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #ecf0f1;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  transition: color 0.2s;
+}
+
+.quickMenuBtn:hover {
+  color: #3498db;
+}
+
+.quickMenuDropdown {
+  position: absolute;
+  bottom: 10px;
+  left: 60px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  min-width: 150px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  z-index: 1000;
+}
+
+.dropdownItem, .dropdownItemDanger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.dropdownItem {
+  color: #2C3E50;
+}
+
+.dropdownItem:hover {
+  background: #f1f5f9;
+}
+
+.dropdownItemDanger {
+  color: #e74c3c;
+}
+
+.dropdownItemDanger:hover {
+  background: #fdf2f2;
+}
+
 @media (max-width: 768px){
   .sidebar {
     position: fixed;
@@ -46,14 +140,29 @@
     left: 5%;
     width: 90%;
     height: 80px;
-    border-radius: 15px;
-    flex-direction: row;
-    gap: 1rem;
+    border-radius: 20px;
+    gap: 0;
+    z-index: 100;
+    justify-content: center;
   }
   .logo img {
-    visibility: hidden;
+    display: none;
   }
   .nav ul {
     flex-direction: row;
+  }
+  .quickMenuContainer {
+    display: none;
+  }
+  .quickMenuDropdown {
+    bottom: 70px;
+    left: auto;
+    right: 10px;
+  }
 }
+
+@media (max-width: 425px){
+  .nav ul {
+    gap: 1rem;
+  }
 }

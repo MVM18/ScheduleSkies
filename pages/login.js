@@ -4,11 +4,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import styles from '@/styles/auth.module.css'
+import { FaEye, FaEyeSlash } from 'react-icons/fa'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -43,7 +45,6 @@ export default function LoginPage() {
         <section className={styles.card}>
           <div className={styles.brandRow}>
             <img src="/images/logo.png" alt="Schedule Skies logo" className={styles.brandLogo} />
-            <span className={styles.brandName}>Schedule Skies</span>
           </div>
 
           <h1 className={styles.heading}>Welcome back</h1>
@@ -65,15 +66,24 @@ export default function LoginPage() {
 
             <div className={styles.field}>
               <label htmlFor="password" className={styles.label}>Password</label>
-              <input
-                id="password"
-                type="password"
-                className={styles.input}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter your password"
-                required
-              />
+              <div className={styles.passwordWrapper}>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  className={styles.input}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
+              </div>
             </div>
 
             {errorMessage ? (
