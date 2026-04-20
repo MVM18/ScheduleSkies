@@ -4,6 +4,10 @@ import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import styles from '../styles/sidebar.module.css'
 import { FaHome, FaCalendarAlt, FaMap, FaUser, FaUserCircle, FaCog, FaSignOutAlt } from 'react-icons/fa'
+import HomeIcon from '../public/images/home.svg'
+import EventsIcon from '../public/images/events.svg'
+import MapIcon from '../public/images/map.svg'
+import ProfileIcon from '../public/images/profile.svg'
 
 export default function Sidebar() {
   const router = useRouter()
@@ -32,22 +36,30 @@ export default function Sidebar() {
         <ul>
           <li>
             <Link href="/">
-              <img src="/images/home-btn.png" />
+              <div className={`btn ${router.pathname === '/' ? styles.active : ''}`}>
+                <HomeIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/plan">
-              <img src="/images/events-btn.png" />
+              <div className={`btn ${router.pathname === '/plan' ? styles.active : ''}`}>
+                <EventsIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/map">
-              <img src="/images/map-btn.png" />
+              <div className={`btn ${router.pathname === '/map' ? styles.active : ''}`}>
+                <MapIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
           <li>
             <Link href="/profile">
-              <img src="/images/profile-btn.png" />
+              <div className={`btn ${router.pathname === '/profile' ? styles.active : ''}`}>
+                <ProfileIcon className={styles.icon} fill="currentColor" />
+              </div>
             </Link>
           </li>
         </ul>

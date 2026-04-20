@@ -57,25 +57,14 @@ export default function Home() {
         <div className="dashboard-content">
           <section className="row">
             <div className="col">
-              <ForecastCards hours={[
-                {time:'8 AM',icon:'sun',temp:28},
-                {time:'12 PM',icon:'sun',temp:38},
-                {time:'4 PM',icon:'cloud',temp:30},
-                {time:'8 PM',icon:'sun',temp:28},
-                
-              ]} />
+              <ForecastCards />
             </div>
             <div className="col">
-              <TrafficInfo incidents={[
-                {level:'heavy',location:'Natalio B. Bacalso Avenue'},
-                {level:'moderate',location:'Tres de Abril Street'},
-                {level:'heavy',location:'Natalio B. Bacalso Avenue'},
-                {level:'moderate',location:'Tres de Abril Street'}
-              ]} />
+              <TrafficInfo />
             </div>
             <div className="col">
               <Notifications notes={[
-                {type:'rain',message:'It might rain on your trip this weekend',detail:'Don\'t Forget to Bring an Umbrella!'},
+                {type:'rain',message:'You need to make real notifications!!!',detail:'Don\'t Forget to Bring an Umbrella!'},
                 {type:'heat',message:'High heat index expected tomorrow: 40°C',detail:'Stay Hydrated and Minimize Outdoor Activity'},
                 {type:'rain',message:'It might rain on your trip this weekend',detail:'Don\'t Forget to Bring an Umbrella!'},
                 {type:'heat',message:'High heat index expected tomorrow: 40°C',detail:'Stay Hydrated and Minimize Outdoor Activity'}
