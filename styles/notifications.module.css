@@ -78,3 +78,20 @@
     font-size: 0.5rem;
   }
 }
+
+[data-theme='dark'] .container {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .note {
+  background-color: #2d3748;
+}
+
+[data-theme='dark'] .message {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .detail {
+  color: #a0aec0;
+}
