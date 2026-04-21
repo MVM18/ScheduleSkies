@@ -22,6 +22,15 @@
   background-repeat: no-repeat;
 }
 
+[data-theme='dark'] .home-header {
+  background-image: none;
+  background-color: #1e293b;
+}
+
+[data-theme='dark'] .dashboard-content {
+  background-color: #111827;
+}
+
 .row {
   display: flex;
   gap: 2rem;

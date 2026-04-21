@@ -44,3 +44,13 @@
   font-size: 0.75rem;
   font-weight: 800;
 }
+
+[data-theme='dark'] .container {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .card {
+  background-color: #2d3748;
+  color: #e2e8f0;
+}

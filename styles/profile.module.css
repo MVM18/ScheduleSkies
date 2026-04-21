@@ -632,10 +632,12 @@
   transition: all 0.3s ease;
 }
 
+/*
 .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
 }
+*/
 
 .card h3 {
   margin: 0 0 1.5rem;
@@ -769,10 +771,12 @@
   transition: all 0.2s ease;
 }
 
+/*
 .listItem:hover {
   background: rgba(237, 244, 255, 0.8);
   border-color: rgba(37, 99, 235, 0.3);
 }
+*/
 
 .listItem h4 {
   margin: 0 0 0.3rem;
@@ -871,10 +875,12 @@
   transition: all 0.2s ease;
 }
 
+/*
 .statBox:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
 }
+*/
 
 .statValue {
   display: block;
@@ -1202,4 +1208,162 @@
   .analyticsGrid {
     grid-template-columns: 1fr;
   }
+}
+
+.card, .profileHeader, .tabBtn, .profileInput, .optionBtn, .segmentBtn, .secondaryBtn, .dangerBtn {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+[data-theme='light'] .card {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme='light'] .tabBtn {
+  color: #64748b;
+}
+
+[data-theme='light'] .tabBtnActive {
+  background-color: #eef2ff;
+  color: #4f46e5;
+}
+
+[data-theme='light'] .profileInput, [data-theme='light'] .budgetInput {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme='light'] .optionBtn, [data-theme='light'] .segmentBtn {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme='light'] .optionActive, [data-theme='light'] .segmentBtnActive {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+  color: #fff !important;
+}
+
+[data-theme='light'] .secondaryBtn, [data-theme='light'] .dangerBtn {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme='light'] .dangerBtn {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+[data-theme='light'] .emptyState h4 {
+  color: #1e293b;
+}
+
+[data-theme='light'] .emptyState p {
+  color: #64748b;
+}
+
+[data-theme='light'] .listItem {
+    background-color: #f8fafc;
+    color: #1e293b;
+}
+
+[data-theme='light'] .listItem p, [data-theme='light'] .metaText {
+    color: #64748b;
+}
+
+[data-theme='light'] .statBox {
+    background-color: #f8fafc;
+    color: #1e293b;
+}
+
+[data-theme='dark'] .profileHeader {
+  background: linear-gradient(120deg, rgba(20, 50, 150, 0.86), rgba(30, 60, 100, 0.9)), url('/images/fort.avif') no-repeat center center/cover;
+}
+
+[data-theme='dark'] .card {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .card h3 {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .tabBtn {
+  color: #94a3b8;
+  background-color: #2d3748;
+}
+
+[data-theme='dark'] .tabBtnActive {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .profileInput,
+[data-theme='dark'] .budgetInput {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #f1f5f9;
+}
+
+[data-theme='dark'] .optionBtn,
+[data-theme='dark'] .segmentBtn {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .optionActive,
+[data-theme='dark'] .segmentBtnActive {
+  background-color: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+  color: #fff !important;
+}
+
+[data-theme='dark'] .secondaryBtn,
+[data-theme='dark'] .dangerBtn {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .dangerBtn {
+  color: #fca5a5;
+  border-color: #b91c1c;
+}
+
+[data-theme='dark'] .emptyState {
+  color: #a0aec0;
+}
+
+[data-theme='dark'] .emptyState h4 {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .emptyState p {
+  color: #a0aec0;
+}
+
+[data-theme='dark'] .listItem {
+  background-color: #2d3748;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .listItem h4 {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .listItem p,
+[data-theme='dark'] .metaText {
+  color: #a0aec0;
+}
+
+[data-theme='dark'] .statBox {
+  background-color: #2d3748;
+  color: #e2e8f0;
 }

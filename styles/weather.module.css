@@ -67,6 +67,15 @@
   font-weight: 500;
 }
 
+[data-theme='dark'] .overview {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .temperatureContainer,
+[data-theme='dark'] .metricsContainer {
+  background-color: rgba(45, 55, 72, 0.5);
+}
+
 @media (max-width: 768px) {
   .greeting {
     font-size: 1.5rem;

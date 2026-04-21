@@ -99,3 +99,34 @@
     font-size: 0.5rem;
   }
 }
+
+[data-theme='dark'] .container {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .event {
+  background-color: #2d3748;
+}
+
+[data-theme='dark'] .plan {
+  border-bottom-color: #4a5568;
+}
+
+[data-theme='dark'] .date,
+[data-theme='dark'] .time {
+  color: #a0aec0;
+}
+
+[data-theme='dark'] .title {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .location,
+[data-theme='dark'] .distance {
+  color: #a0aec0;
+}
+
+[data-theme='dark'] .view_all {
+  color: #e2e8f0;
+}

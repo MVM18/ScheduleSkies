@@ -166,3 +166,15 @@
     gap: 1rem;
   }
 }
+
+[data-theme='dark'] .sidebar {
+  background-color: #1e293b;
+}
+
+[data-theme='dark'] .icon path {
+  fill: #94a3b8;
+}
+
+[data-theme='dark'] .active .icon path {
+  fill: #ffffff;
+}

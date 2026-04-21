@@ -11,8 +11,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const GEOAPIFY_API_KEY = '6e3efd748a384a27baf68a0621732be5';
-const WEATHER_API_KEY = '177d6b3e957bb1d34b28bf7bdf9d1360';
+const GEOAPIFY_API_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
+const WEATHER_API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
 const mapStyle = 'osm-bright';
 
 const createIcon = (color) => L.divIcon({
@@ -1006,7 +1006,6 @@ const MapScreen = ({
       fontFamily: "'Segoe UI', sans-serif",
       overflow: 'hidden',
       position: 'relative',
-
       pointerEvents: 'none'
     }}>
 
@@ -1098,7 +1097,60 @@ const MapScreen = ({
             </div>
           ) : (
             <>
-              <WeatherWidget location={weatherLocation} />
+              {/* Weather and Traffic stacked vertically */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                <WeatherWidget location={weatherLocation} />
+                
+                {/* Traffic Card - moved below weather with same size and design */}
+                {trafficSummary && routeInfo && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 14px',
+                    borderRadius: '25px',
+                    gap: '10px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    whiteSpace: 'nowrap',
+                    background: trafficSummary.level === 'Heavy' ? 'linear-gradient(135deg, #FF5252, #C62828)' : 
+                               trafficSummary.level === 'Moderate' ? 'linear-gradient(135deg, #FFB74D, #F57F17)' : 
+                               'linear-gradient(135deg, #66BB6A, #4CAF50)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s',
+                    minWidth: '200px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  title={`${trafficSummary.heavySegments} heavy • ${trafficSummary.moderateSegments} moderate • ${trafficSummary.lightSegments} light`}
+                  >
+                    <span style={{ fontSize: '20px' }}>
+                      {trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: '700', fontSize: '14px' }}>
+                        {trafficSummary.level} Traffic
+                      </span>
+                      <span style={{ fontSize: '10px', opacity: 0.9 }}>
+                        Delay: {routeInfo.trafficDelay} min
+                      </span>
+                    </div>
+                    <div style={{
+                      width: '1px',
+                      height: '25px',
+                      background: 'rgba(255,255,255,0.3)',
+                      margin: '0 2px'
+                    }} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '600' }}>
+                        {routeInfo.adjustedTime} min total
+                      </span>
+                      <span style={{ fontSize: '9px', opacity: 0.9 }}>
+                        {routeInfo.distance} km
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1328,7 +1380,8 @@ const MapScreen = ({
           flexShrink: 0,
           position: 'relative',
           zIndex: 2,
-          overflowY: 'auto'
+          overflowY: 'auto',
+          pointerEvents: 'auto'
         }}>
           <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#4A148C', margin: '0 0 4px', textAlign: 'center' }}>
             🗺️ Itinerary Navigation
@@ -1423,6 +1476,8 @@ const MapScreen = ({
           )}
         </div>
       )}
+
+      {/* Places Along Route Panel */}
       {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
         <div style={{
           width: '280px',
@@ -1523,35 +1578,6 @@ const MapScreen = ({
               >
                 Undo
               </button>
-            </div>
-          )}
-
-          {trafficSummary && routeInfo && (
-            <div style={{
-              marginTop: 'auto',
-              padding: '12px',
-              background: trafficSummary.level === 'Heavy' ? '#FFEBEE' : trafficSummary.level === 'Moderate' ? '#FFF3E0' : '#E8F5E9',
-              borderRadius: '12px',
-              borderTop: `3px solid ${trafficSummary.color}`
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '16px' }}>
-                  {trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}
-                </span>
-                <span style={{ fontWeight: '700', fontSize: '12px', color: trafficSummary.color }}>
-                  {trafficSummary.level} Traffic
-                </span>
-              </div>
-
-              <div style={{ fontSize: '10px', color: '#666', marginBottom: '6px' }}>
-                {trafficSummary.heavySegments > 0 && `🔴 ${trafficSummary.heavySegments} heavy • `}
-                {trafficSummary.moderateSegments > 0 && `🟠 ${trafficSummary.moderateSegments} moderate • `}
-                🟢 {trafficSummary.lightSegments} light
-              </div>
-
-              <div style={{ fontSize: '11px', fontWeight: '600', color: trafficSummary.color }}>
-                Est. delay: {routeInfo.trafficDelay} min
-              </div>
             </div>
           )}
         </div>

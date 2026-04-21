@@ -7,7 +7,13 @@
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
-  background-color: #9BBEEDCC;
+  background-color: #f0f4f8; /* Light mode default background */
+}
+
+/* Dark mode styles */
+body[data-theme='dark'] {
+  color: #f1f5f9;
+  background-color: #111827;
 }
 
 main {

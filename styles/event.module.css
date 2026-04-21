@@ -671,7 +671,7 @@
   transition: background 0.2s;
 }
 
-.btnCancel:hover {
+ btnCancel:hover {
   background: #f1f5f9;
   color: #334155;
 }
@@ -689,7 +689,7 @@
   transition: all 0.2s;
 }
 
-.btnSave:hover {
+ btnSave:hover {
   background: #62a3c7;
   transform: translateY(-1px);
 }
@@ -1641,4 +1641,36 @@
   .cloud {
     display: none;
   }
+}
+
+[data-theme='dark'] .appContainer {
+  background: #111827;
+}
+
+[data-theme='dark'] .titleGlass {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(51, 65, 85, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+[data-theme='dark'] .titleGlass h1,
+[data-theme='dark'] .details h3 {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .searchBar,
+[data-theme='dark'] .filterBtn,
+[data-theme='dark'] .actionBtn,
+[data-theme='dark'] .eventCard,
+[data-theme='dark'] .formModal,
+[data-theme='dark'] .formGroup input, 
+[data-theme='dark'] .formGroup select {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .pill,
+[data-theme='dark'] .details p {
+  color: #a0aec0;
 }

@@ -146,6 +146,11 @@ const ProfilePage = () => {
     }
   }, []);
 
+  // Apply theme to body
+  useEffect(() => {
+    document.body.setAttribute('data-theme', themeMode);
+  }, [themeMode]);
+
   // Persist theme
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
