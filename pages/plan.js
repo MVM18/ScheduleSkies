@@ -6,6 +6,7 @@ import { buildWeatherContext, detectScheduleConflicts } from '@/lib/aiContext';
 import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
 import ShareModal from '@/components/ShareModal';
+import BudgetModal from '@/components/BudgetModal';
 
 const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
@@ -84,6 +85,10 @@ const MyEvents = () => {
   // Share / Collaboration State
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedEventForShare, setSelectedEventForShare] = useState(null);
+
+  // Budget State
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+  const [selectedEventForBudget, setSelectedEventForBudget] = useState(null);
 
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
@@ -1015,7 +1020,7 @@ const MyEvents = () => {
                           </div>
                         )}
 
-                        {/* Itinerary, Share & Navigate Buttons */}
+                        {/* Itinerary, Share, Budget & Navigate Buttons */}
                         <div className={styles.cardBtnRow}>
                           <button
                             className={styles.itineraryBtn}
@@ -1029,6 +1034,13 @@ const MyEvents = () => {
                             onClick={() => { setSelectedEventForShare(event); setIsShareModalOpen(true); }}
                           >
                             🔗 Share
+                          </button>
+                          <button
+                            className={styles.itineraryBtn}
+                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', border: 'none' }}
+                            onClick={() => { setSelectedEventForBudget(event); setIsBudgetOpen(true); }}
+                          >
+                            💰 Budget
                           </button>
                           {(event.latitude && event.longitude) ? (
                             <button
@@ -1405,6 +1417,13 @@ const MyEvents = () => {
                 >
                   🔗 Share Itinerary
                 </button>
+                <button
+                  className={styles.navigateBtnLg}
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                  onClick={() => { setSelectedEventForBudget(selectedEventForItinerary); setIsBudgetOpen(true); }}
+                >
+                  💰 Budget
+                </button>
                 {(selectedEventForItinerary.latitude && selectedEventForItinerary.longitude) && (
                   <button className={styles.navigateBtnLg} onClick={() => handleNavigateToVenue(selectedEventForItinerary)}>
                     🧭 Navigate to Venue
@@ -1509,6 +1528,15 @@ const MyEvents = () => {
         <ShareModal
           event={selectedEventForShare}
           onClose={() => { setIsShareModalOpen(false); setSelectedEventForShare(null); }}
+        />
+      )}
+
+      {/* --- BUDGET MODAL --- */}
+      {isBudgetOpen && selectedEventForBudget && (
+        <BudgetModal
+          event={selectedEventForBudget}
+          activities={activities}
+          onClose={() => { setIsBudgetOpen(false); setSelectedEventForBudget(null); }}
         />
       )}
     </div>
