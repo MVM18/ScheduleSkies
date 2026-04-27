@@ -13,10 +13,36 @@ import styles from '../styles/event.module.css';
 
 export default function Home() {
   const [username, setUsername] = useState('User');
+  const [userId, setUserId] = useState(null)
 
   useEffect(() => {
-    // ... (rest of the useEffect remains the same)
-  }, []);
+    const fetchLoggedInUser = async () => {
+      const { data: authData } = await supabase.auth.getUser()
+      const user = authData?.user
+
+      if (!user) {
+        setUsername('User')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const displayName =
+        profile?.full_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split('@')[0] ||
+        'User'
+
+      setUsername(displayName)
+      setUserId(user.id)
+    }
+
+    fetchLoggedInUser()
+  }, [])
 
   return (
     <>
@@ -45,12 +71,7 @@ export default function Home() {
                 <TrafficInfo />
               </div>
               <div className="col">
-                <Notifications notes={[
-                  {type:'rain',message:'It might rain on your trip this weekend',detail:"Don't Forget to Bring an Umbrella!"},
-                  {type:'heat',message:'High heat index expected tomorrow: 40°C',detail:'Stay Hydrated and Minimize Outdoor Activity'},
-                  {type:'rain',message:'It might rain on your trip this weekend',detail:"Don't Forget to Bring an Umbrella!"},
-                  {type:'heat',message:'High heat index expected tomorrow: 40°C',detail:'Stay Hydrated and Minimize Outdoor Activity'},
-                ]} />
+                <Notifications userId={userId}/>
               </div>
             </section>
 
