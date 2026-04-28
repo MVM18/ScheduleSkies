@@ -39,6 +39,12 @@ export default function TrafficInfo() {
       }
     } catch (_) {}
 
+    // Guard: skip if API key is missing
+    if (!process.env.NEXT_PUBLIC_TRAFFIC_API_KEY) {
+      setLoading(false);
+      return;
+    }
+
     const bbox = await getBboxFromUserLocation(5);
 
     const fields = encodeURIComponent("{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description},startTime,endTime,from,to}}}");
@@ -47,6 +53,11 @@ export default function TrafficInfo() {
 
     try {
       const response = await fetch(url);
+      if (!response.ok) {
+        console.warn('Traffic API returned', response.status);
+        setLoading(false);
+        return;
+      }
       const data = await response.json();
       const incidentArray = await transformIncidents(data);
 
