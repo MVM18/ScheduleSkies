@@ -26,14 +26,16 @@ export default function SuggestedPlaces({ places = [] }) {
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status} - ${response.statusText}`);
+        throw new Error(`Server error ${response.status}`);
       }
 
       const data = await response.json();
+
+      // API always returns { places: [] } now — no throw on empty
       setPlacesData(data.places ?? []);
-    } catch (error) {
-      console.error('Google Places Error:', error);
-      setError(error.message);
+    } catch (err) {
+      console.error('Places error:', err);
+      setError(err.message || 'Could not load nearby places');
     } finally {
       setLoading(false);
     }
@@ -68,9 +70,61 @@ export default function SuggestedPlaces({ places = [] }) {
             <div className="loading-spinner"></div>
           </div>
         ) : error ? (
-          <p>Failed to load places.</p>
+          /* Premium error state — no crash, no bare text */
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '28px 20px',
+            textAlign: 'center',
+            background: 'rgba(255,255,255,0.08)',
+            borderRadius: '16px',
+            border: '1px dashed rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(6px)',
+            gap: '10px',
+          }}>
+            <span style={{ fontSize: '36px' }}>🗺️</span>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '14px', color: 'rgba(255,255,255,0.9)' }}>
+              Nearby places unavailable
+            </p>
+            <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.55)', maxWidth: '200px' }}>
+              Place suggestions require a Google Places API key.
+            </p>
+            <button
+              onClick={searchNearbyPlaces}
+              style={{
+                marginTop: '6px',
+                padding: '7px 16px',
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '10px',
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s',
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              ↺ Retry
+            </button>
+          </div>
         ) : placesData.length === 0 ? (
-          <p>No places found nearby.</p>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            gap: '8px',
+          }}>
+            <p style={{ fontSize: '12px', fontWeight: 600 }}>
+              No places found nearby...
+            </p>
+          </div>
         ) : (
           placesData.map((place) => (
             <div key={place.id} className={styles.card}>
@@ -78,12 +132,13 @@ export default function SuggestedPlaces({ places = [] }) {
                 src={getGooglePhoto(place.photos)}
                 alt={place.displayName?.text}
                 className={styles.image}
+                onError={e => { e.currentTarget.src = 'https://placehold.co/400?text=No+Image'; }}
               />
               <div className={styles.info}>
                 <h4 className={styles.title}>{place.displayName?.text}</h4>
                 <p className={styles.description}>{place.formattedAddress}</p>
                 <div className={styles.rating}>
-                  <FaStar className={styles.star} /> {place.rating ?? 'N/A'} ({place.userRatingCount})
+                  <FaStar className={styles.star} /> {place.rating ?? 'N/A'} ({place.userRatingCount ?? 0})
                 </div>
               </div>
             </div>

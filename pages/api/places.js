@@ -4,6 +4,15 @@ const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 export default async function handler(req, res) {
   const { ll, radius, limit } = req.query;
 
+  // Guard: missing API key — return empty gracefully instead of crashing
+  if (!process.env.GOOGLE_PLACES_API_KEY) {
+    return res.status(200).json({ places: [], _notice: 'GOOGLE_PLACES_API_KEY not configured' });
+  }
+
+  if (!ll) {
+    return res.status(400).json({ error: 'll (lat,lng) parameter is required' });
+  }
+
   const cacheKey = `${ll}-${radius}-${limit}`;
 
   // Return cached result if fresh
@@ -12,7 +21,13 @@ export default async function handler(req, res) {
     return res.status(200).json(cached.data);
   }
 
-  const [lat, lng] = ll.split(',');
+  const parts = ll.split(',');
+  const lat = parseFloat(parts[0]);
+  const lng = parseFloat(parts[1]);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: 'Invalid ll parameter — expected "lat,lng"' });
+  }
 
   try {
     const response = await fetch(
@@ -29,10 +44,7 @@ export default async function handler(req, res) {
           includedTypes: ['tourist_attraction', 'restaurant', 'cafe', 'shopping_mall', 'park', 'museum', 'beach'],
           locationRestriction: {
             circle: {
-              center: {
-                latitude: parseFloat(lat),
-                longitude: parseFloat(lng)
-              },
+              center: { latitude: lat, longitude: lng },
               radius: parseFloat(radius) || 5000
             }
           }
@@ -42,10 +54,17 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    cache.set(cacheKey, { data, timestamp: Date.now() });
+    if (!response.ok) {
+      // Log the actual Google error server-side but return a clean error to the client
+      console.error('Google Places API error:', response.status, data);
+      return res.status(200).json({ places: [], _error: `Google Places returned ${response.status}` });
+    }
 
-    res.status(response.status).json(data);
+    const result = { places: data.places || [] };
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch places' });
+    console.error('Places fetch error:', error);
+    return res.status(200).json({ places: [], _error: error.message });
   }
 }

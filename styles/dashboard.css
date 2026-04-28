@@ -2,11 +2,14 @@
 .dashboard {
   display: flex;
   flex-direction: column;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(180deg, #a6d8f0 0%, #76b5d9 100%);
+  padding: 40px;
 }
 
 .dashboard-content {
   margin-left: 80px; /* sidebar width */
-  padding: 2rem 2rem;
+  padding: 1rem;
   flex: 2;
   display: flex;
   flex-direction: column;
@@ -39,6 +42,7 @@
 
 .col {
   flex: 1;
+  min-width: 0;
 }
 
 .col.wide {
@@ -55,6 +59,41 @@
   border-radius: 10px;
 }
 
+/* --- Background Decor --- */
+.sun {
+  position: absolute;
+  top: 40px;
+  right: 5%;
+  width: 100px;
+  height: 100px;
+  background: #FFEB3B;
+  border-radius: 50%;
+  filter: blur(2px);
+  opacity: 0.8;
+  z-index: 0;
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 100px;
+  z-index: 0;
+}
+
+.cloud1 {
+  width: 280px;
+  height: 80px;
+  top: 20px;
+  left: 15%;
+}
+
+.cloud2 {
+  width: 200px;
+  height: 60px;
+  top: 80px;
+  left: 60%;
+}
+
 @media (max-width: 1024px) {
   .row {
     flex-direction: column;
@@ -62,11 +101,24 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard {
+    padding: 20px;
+  }
   .home-header {
     margin-left: 0;
   }
   .dashboard-content{
     margin-left: 0;
+    padding: 1rem;
     margin-bottom: 50px;
   }
+  /* Background — hide on mobile */
+  .sun,
+  .cloud {
+    display: none;
+  }
+}
+
+[data-theme='dark'] .dashboard {
+  background: #111827;
 }

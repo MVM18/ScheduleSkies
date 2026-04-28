@@ -50,3 +50,7 @@ web-based travel planning tool with real-time environmental awareness and collab
 (Choose an appropriate license or add later.)
 # ScheduleSkies
 Schedule Skies, a smart web-based event and travel planning application. 
+
+# RUN THIS COMMANDS
+
+-----npm install @svgr/webpack----

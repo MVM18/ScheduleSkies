@@ -2,10 +2,11 @@
   display: flex;
   background-color: #FFF4D8;
   height: 200px;
-  border-radius: 15px;
+  border-radius: 25px;
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 1.5rem;
+  min-width: 200px;
 }
 
 .title {
@@ -80,8 +81,16 @@
   font-size: 0.75rem;
 }
 
+
+@media (max-width: 768px){
+  .container {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 425px){
   .text, .location {
     font-size: 0.6rem;
+
   }
 }

@@ -382,3 +382,157 @@ CREATE POLICY "Users can delete their own activities"
 -- ============================================================================
 -- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'events';
 -- SELECT * FROM public.itinerary_activities LIMIT 1;
+
+-- ============================================================================
+-- COLLABORATION & SHARING FEATURE: SCHEMA UPDATES
+-- Run this in Supabase SQL Editor (Database > SQL Editor > New Query)
+-- ============================================================================
+
+-- 1. EVENT SHARES table
+CREATE TABLE IF NOT EXISTS public.event_shares (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id     UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  owner_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  token        TEXT NOT NULL UNIQUE,
+  role         TEXT NOT NULL DEFAULT 'view',   -- 'view' | 'edit'
+  label        TEXT,
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  expires_at   TIMESTAMPTZ                     -- NULL = never expires
+);
+
+ALTER TABLE public.event_shares ENABLE ROW LEVEL SECURITY;
+
+-- Owner can fully manage their shares
+CREATE POLICY "Owner manages shares"
+  ON public.event_shares FOR ALL
+  USING (auth.uid() = owner_id)
+  WITH CHECK (auth.uid() = owner_id);
+
+-- Anyone can read a share by token (needed for public shared view)
+CREATE POLICY "Anyone can read share by token"
+  ON public.event_shares FOR SELECT
+  USING (true);
+
+-- 2. SHARE COLLABORATORS table (tracks who opened a shared link)
+CREATE TABLE IF NOT EXISTS public.share_collaborators (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  share_id    UUID NOT NULL REFERENCES public.event_shares(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  guest_label TEXT,
+  joined_at   TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.share_collaborators ENABLE ROW LEVEL SECURITY;
+
+-- Share owner can see who joined
+CREATE POLICY "Share owner views collaborators"
+  ON public.share_collaborators FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.event_shares es
+      WHERE es.id = share_id AND es.owner_id = auth.uid()
+    )
+  );
+
+-- Anyone can insert their own collaborator record
+CREATE POLICY "Anyone can insert collaborator record"
+  ON public.share_collaborators FOR INSERT
+  WITH CHECK (true);
+
+-- 3. Enable Realtime for itinerary_activities
+-- In Supabase Dashboard: Database > Replication > Tables > enable itinerary_activities
+
+-- ============================================================================
+-- VERIFICATION QUERIES (Collaboration)
+-- ============================================================================
+-- SELECT * FROM public.event_shares LIMIT 5;
+-- SELECT * FROM public.share_collaborators LIMIT 5;
+
+-- ============================================================================
+-- BUDGET TRACKING FEATURE: SCHEMA UPDATES
+-- Run this in Supabase SQL Editor (Database > SQL Editor > New Query)
+-- ============================================================================
+
+-- 1. EVENT_BUDGETS — total budget per event
+CREATE TABLE IF NOT EXISTS public.event_budgets (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id   UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  total      NUMERIC NOT NULL DEFAULT 0,
+  currency   TEXT DEFAULT '₱',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.event_budgets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own event budgets"
+  ON public.event_budgets FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND e.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND e.user_id = auth.uid())
+  );
+
+-- 2. EVENT_EXPENSES — individual expenses
+CREATE TABLE IF NOT EXISTS public.event_expenses (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id     UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  activity_id  UUID REFERENCES public.itinerary_activities(id) ON DELETE SET NULL,
+  name         TEXT NOT NULL,
+  amount       NUMERIC NOT NULL,
+  category     TEXT DEFAULT 'Other',
+  paid_by      TEXT NOT NULL,
+  paid_by_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  date         TIMESTAMPTZ DEFAULT now(),
+  notes        TEXT,
+  created_by   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.event_expenses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own event expenses"
+  ON public.event_expenses FOR ALL
+  USING (
+    EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND e.user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND e.user_id = auth.uid())
+  );
+
+-- 3. EXPENSE_SPLITS — who owes what
+CREATE TABLE IF NOT EXISTS public.expense_splits (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  expense_id  UUID NOT NULL REFERENCES public.event_expenses(id) ON DELETE CASCADE,
+  user_label  TEXT NOT NULL,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  amount      NUMERIC NOT NULL,
+  is_settled  BOOLEAN DEFAULT false,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.expense_splits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own expense splits"
+  ON public.expense_splits FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.event_expenses ex
+      JOIN public.events e ON e.id = ex.event_id
+      WHERE ex.id = expense_id AND e.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.event_expenses ex
+      JOIN public.events e ON e.id = ex.event_id
+      WHERE ex.id = expense_id AND e.user_id = auth.uid()
+    )
+  );
+
+-- ============================================================================
+-- VERIFICATION QUERIES (Budget)
+-- ============================================================================
+-- SELECT * FROM public.event_budgets LIMIT 5;
+-- SELECT * FROM public.event_expenses LIMIT 5;
+-- SELECT * FROM public.expense_splits LIMIT 5;

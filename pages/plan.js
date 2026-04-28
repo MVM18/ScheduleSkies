@@ -5,6 +5,8 @@ import { getLocationWithFallback } from "@/lib/getLocation";
 import { buildWeatherContext, detectScheduleConflicts } from '@/lib/aiContext';
 import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
+import ShareModal from '@/components/ShareModal';
+import BudgetModal from '@/components/BudgetModal';
 
 const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
@@ -64,6 +66,8 @@ const MyEvents = () => {
   const [editingActivityId, setEditingActivityId] = useState(null);
   const initialActivityForm = { activity_name: '', description: '', start_time: '', end_time: '', location: '', latitude: null, longitude: null };
   const [activityForm, setActivityForm] = useState(initialActivityForm);
+  const [draggedEventId, setDraggedEventId] = useState(null);
+  const [dragOverDate, setDragOverDate] = useState(null);
   const [activityLocationResults, setActivityLocationResults] = useState([]);
   const [isSearchingActivityLocation, setIsSearchingActivityLocation] = useState(false);
 
@@ -77,6 +81,14 @@ const MyEvents = () => {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+
+  // Share / Collaboration State
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedEventForShare, setSelectedEventForShare] = useState(null);
+
+  // Budget State
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+  const [selectedEventForBudget, setSelectedEventForBudget] = useState(null);
 
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
@@ -713,6 +725,96 @@ const MyEvents = () => {
     return { dateStr, startTime, endTime };
   };
 
+  const getEventCalendarDate = (event) => {
+    return event.date || (event.start_datetime ? event.start_datetime.split('T')[0] : null);
+  };
+
+  const moveEventToDate = async (event, targetDate) => {
+    const updateData = { date: targetDate };
+    if (event.start_datetime) {
+      const start = new Date(event.start_datetime);
+      const [year, month, day] = targetDate.split('-').map(Number);
+      const newStart = new Date(start);
+      newStart.setFullYear(year, month - 1, day);
+      updateData.start_datetime = newStart.toISOString();
+    }
+    if (event.end_datetime) {
+      const end = new Date(event.end_datetime);
+      const [year, month, day] = targetDate.split('-').map(Number);
+      const newEnd = new Date(end);
+      newEnd.setFullYear(year, month - 1, day);
+      updateData.end_datetime = newEnd.toISOString();
+    }
+
+    const { data, error } = await supabase.from('events').update(updateData).eq('id', event.id).select();
+    if (data && !error) {
+      setEventData(prev => prev.map(ev => ev.id === event.id ? generateDynamicProps(data[0]) : ev));
+    }
+  };
+
+  const handleDragStart = (eventId) => {
+    setDraggedEventId(eventId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedEventId(null);
+    setDragOverDate(null);
+  };
+
+  const handleDropOnDate = async (dateStr) => {
+    if (!draggedEventId) return;
+    const event = eventData.find(ev => String(ev.id) === String(draggedEventId));
+    if (!event) return;
+    const currentDateStr = getEventCalendarDate(event);
+    if (currentDateStr === dateStr) {
+      handleDragEnd();
+      return;
+    }
+    await moveEventToDate(event, dateStr);
+    handleDragEnd();
+  };
+
+  const getCalendarConflictEventIds = () => {
+    const conflictIds = new Set();
+    const grouped = {};
+
+    eventData.forEach(event => {
+      const date = getEventCalendarDate(event);
+      if (!date) return;
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(event);
+    });
+
+    Object.values(grouped).forEach(events => {
+      const sorted = [...events].sort((a, b) => {
+        const aTime = a.start_datetime ? new Date(a.start_datetime) : new Date(`${getEventCalendarDate(a)}T00:00:00`);
+        const bTime = b.start_datetime ? new Date(b.start_datetime) : new Date(`${getEventCalendarDate(b)}T00:00:00`);
+        return aTime - bTime;
+      });
+
+      for (let i = 0; i < sorted.length; i++) {
+        const a = sorted[i];
+        const aStart = a.start_datetime ? new Date(a.start_datetime) : new Date(`${getEventCalendarDate(a)}T00:00:00`);
+        const aEnd = a.end_datetime ? new Date(a.end_datetime) : new Date(`${getEventCalendarDate(a)}T23:59:59`);
+
+        for (let j = i + 1; j < sorted.length; j++) {
+          const b = sorted[j];
+          const bStart = b.start_datetime ? new Date(b.start_datetime) : new Date(`${getEventCalendarDate(b)}T00:00:00`);
+          const bEnd = b.end_datetime ? new Date(b.end_datetime) : new Date(`${getEventCalendarDate(b)}T23:59:59`);
+
+          if (aEnd > bStart && aStart < bEnd) {
+            conflictIds.add(a.id);
+            conflictIds.add(b.id);
+          }
+        }
+      }
+    });
+
+    return conflictIds;
+  };
+
+  const calendarConflictEventIds = getCalendarConflictEventIds();
+
   const progressPercent = getProgressPercent();
 
   return (
@@ -918,13 +1020,27 @@ const MyEvents = () => {
                           </div>
                         )}
 
-                        {/* Itinerary & Navigate Buttons */}
+                        {/* Itinerary, Share, Budget & Navigate Buttons */}
                         <div className={styles.cardBtnRow}>
                           <button
                             className={styles.itineraryBtn}
                             onClick={() => handleOpenItinerary(event)}
                           >
                             📋 Itinerary
+                          </button>
+                          <button
+                            className={styles.itineraryBtn}
+                            style={{ background: 'linear-gradient(135deg, #4A90D9, #6D7DB9)', color: 'white', border: 'none' }}
+                            onClick={() => { setSelectedEventForShare(event); setIsShareModalOpen(true); }}
+                          >
+                            🔗 Share
+                          </button>
+                          <button
+                            className={styles.itineraryBtn}
+                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', border: 'none' }}
+                            onClick={() => { setSelectedEventForBudget(event); setIsBudgetOpen(true); }}
+                          >
+                            💰 Budget
                           </button>
                           {(event.latitude && event.longitude) ? (
                             <button
@@ -1294,6 +1410,20 @@ const MyEvents = () => {
             <div className={styles.itineraryFooter}>
               <span className={styles.activityCount}>{activities.length} activit{activities.length === 1 ? 'y' : 'ies'}</span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  className={styles.navigateBtnLg}
+                  style={{ background: 'linear-gradient(135deg, #4A90D9, #6D7DB9)' }}
+                  onClick={() => { setSelectedEventForShare(selectedEventForItinerary); setIsShareModalOpen(true); }}
+                >
+                  🔗 Share Itinerary
+                </button>
+                <button
+                  className={styles.navigateBtnLg}
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                  onClick={() => { setSelectedEventForBudget(selectedEventForItinerary); setIsBudgetOpen(true); }}
+                >
+                  💰 Budget
+                </button>
                 {(selectedEventForItinerary.latitude && selectedEventForItinerary.longitude) && (
                   <button className={styles.navigateBtnLg} onClick={() => handleNavigateToVenue(selectedEventForItinerary)}>
                     🧭 Navigate to Venue
@@ -1342,15 +1472,48 @@ const MyEvents = () => {
                 const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
                 const dayEvents = eventData.filter(e => e.date === dateStr);
                 const hasEvent = dayEvents.length > 0;
+                const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
                 return (
-                  <div key={day} className={styles.calCell} style={hasEvent ? { backgroundColor: 'rgba(94, 224, 147, 0.1)', border: '1px solid #5EE093' } : {}}>
+                  <div
+                    key={day}
+                    className={styles.calCell}
+                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
+                    onDragLeave={() => setDragOverDate(null)}
+                    style={
+                      dragOverDate === dateStr
+                        ? { backgroundColor: 'rgba(118, 181, 217, 0.2)', border: '2px dashed #76b5d9' }
+                        : hasConflict
+                          ? { backgroundColor: 'rgba(248, 113, 113, 0.12)', border: '1px solid #EF4444' }
+                          : hasEvent
+                            ? { backgroundColor: 'rgba(94, 224, 147, 0.1)', border: '1px solid #5EE093' }
+                            : {}
+                    }
+                  >
                     <span className={styles.calDayNum} style={hasEvent ? { fontWeight: 'bold', color: '#2C3E50' } : {}}>{day}</span>
                     <div className={styles.calEventsContainer}>
-                      {dayEvents.map(ev => (
-                        <div key={ev.id} className={styles.calEventPill} style={{ backgroundColor: ev.typeColor }}>
-                          {ev.title}
-                        </div>
-                      ))}
+                      {dayEvents.map(ev => {
+                        const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
+                        const isConflict = calendarConflictEventIds.has(ev.id);
+                        return (
+                          <div
+                            key={ev.id}
+                            className={styles.calEventPill}
+                            draggable
+                            onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
+                            onDragEnd={handleDragEnd}
+                            style={{
+                              backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
+                              color: isConflict ? '#fff' : '#111',
+                              border: isConflict ? '1px solid #DC2626' : undefined,
+                              cursor: 'grab'
+                            }}
+                            title={`Drag to move event to another day`}
+                          >
+                            {eventTime} · {ev.title}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1358,6 +1521,23 @@ const MyEvents = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- SHARE MODAL --- */}
+      {isShareModalOpen && selectedEventForShare && (
+        <ShareModal
+          event={selectedEventForShare}
+          onClose={() => { setIsShareModalOpen(false); setSelectedEventForShare(null); }}
+        />
+      )}
+
+      {/* --- BUDGET MODAL --- */}
+      {isBudgetOpen && selectedEventForBudget && (
+        <BudgetModal
+          event={selectedEventForBudget}
+          activities={activities}
+          onClose={() => { setIsBudgetOpen(false); setSelectedEventForBudget(null); }}
+        />
       )}
     </div>
   );

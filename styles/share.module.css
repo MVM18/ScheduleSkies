@@ -1,0 +1,860 @@
+/* ============================================================
+   SHARE MODULE CSS — ScheduleSkies Collaboration Feature
+   ============================================================ */
+
+/* --- Share Modal Overlay & Container --- */
+.shareOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: overlayFade 0.2s ease;
+}
+
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.shareModal {
+  background: #ffffff;
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  border-radius: 24px;
+  box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSlideUp {
+  from { transform: scale(0.93) translateY(24px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* --- Header --- */
+.shareHeader {
+  background: linear-gradient(135deg, #4A90D9 0%, #6D7DB9 55%, #8B5CF6 100%);
+  padding: 24px 28px 20px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.shareHeader::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 160px;
+  height: 160px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+}
+
+.shareHeaderTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}
+
+.shareHeaderTitle {
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 6px;
+}
+
+.shareHeaderTitle h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.shareCloseBtn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.shareCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* --- Body --- */
+.shareBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: #f8fafc;
+}
+
+/* --- Section Headings --- */
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+}
+
+/* --- Role Selector --- */
+.roleSelector {
+  display: flex;
+  gap: 0;
+  background: #e8edf2;
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.roleBtn {
+  flex: 1;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: #64748b;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.roleBtnActive {
+  background: white !important;
+  color: #1e293b !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Expiry Selector --- */
+.expirySelector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expiryBtn {
+  padding: 7px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: white;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.expiryBtnActive {
+  border-color: #6D7DB9;
+  background: #EEF0F8;
+  color: #3D4E8A;
+}
+
+/* --- Generate Button --- */
+.generateBtn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #4A90D9, #6D7DB9);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(74, 144, 217, 0.35);
+}
+
+.generateBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74, 144, 217, 0.45);
+}
+
+.generateBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Share Link Box --- */
+.shareLinkSection {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeSlideUp 0.3s ease;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.shareLinkBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.shareLinkText {
+  flex: 1;
+  font-size: 12px;
+  color: #475569;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copyBtn {
+  background: #6D7DB9;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.copyBtn:hover {
+  background: #5a6aa6;
+}
+
+.copyBtnSuccess {
+  background: #15A862 !important;
+}
+
+.shareLinkMeta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.roleBadge {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.roleBadgeView {
+  background: #D5EAF9;
+  color: #2C5282;
+}
+
+.roleBadgeEdit {
+  background: #D1F2E0;
+  color: #15A862;
+}
+
+/* --- Existing Shares List --- */
+.sharesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shareItem {
+  background: white;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.shareItem:hover {
+  border-color: #c8d4f0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.shareItemIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #EEF0F8, #D5EAF9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.shareItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.shareItemLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shareItemMeta {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.revokeBtn {
+  background: transparent;
+  border: 1.5px solid #fecaca;
+  color: #ef4444;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.revokeBtn:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+/* --- Collaborators --- */
+.collaboratorsList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.collaboratorChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 4px 12px 4px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.collaboratorAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6D7DB9, #8B5CF6);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyShareState {
+  text-align: center;
+  padding: 20px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* --- Shared Page (public view) --- */
+.sharedPage {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #a6d8f0 0%, #76b5d9 50%, #5ba3c9 100%);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.sharedNav {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.sharedNavBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  color: white;
+  text-decoration: none;
+}
+
+.sharedNavBadge {
+  background: rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,0.35);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.sharedContent {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+/* --- Shared Event Card --- */
+.sharedEventCard {
+  background: white;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+  margin-bottom: 24px;
+  animation: modalSlideUp 0.35s ease;
+}
+
+.sharedEventHeader {
+  background: linear-gradient(135deg, #76b5d9 0%, #6D7DB9 50%, #8B5CF6 100%);
+  padding: 28px 32px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.sharedEventHeader::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 200px;
+  height: 200px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+}
+
+.sharedEventTag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  opacity: 0.8;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.sharedEventTitle {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 20px;
+  letter-spacing: -0.5px;
+  position: relative;
+  z-index: 1;
+}
+
+.sharedInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.sharedInfoItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sharedInfoItem .icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sharedInfoItem .label {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.7;
+  display: block;
+}
+
+.sharedInfoItem .value {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+}
+
+.sharedInfoItem.clickable {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.sharedInfoItem.clickable:hover {
+  opacity: 0.8;
+}
+
+/* --- Nav Action Buttons --- */
+.sharedNavActions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.navActionBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s ease;
+}
+
+.navBtnPrimary {
+  background: white;
+  color: #2C5282;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+}
+
+.navBtnPrimary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+}
+
+.navBtnSecondary {
+  background: rgba(255,255,255,0.25);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.35);
+  backdrop-filter: blur(8px);
+}
+
+.navBtnSecondary:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+/* --- Timeline on Shared Page --- */
+.sharedTimeline {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.sharedTimelineHeader {
+  padding: 20px 28px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sharedTimelineTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sharedTimelineBody {
+  padding: 24px 28px;
+}
+
+.sharedProgressContainer {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e8edf2;
+}
+
+.sharedProgressBar {
+  height: 8px;
+  background: #e8edf2;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.sharedProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #76b5d9, #6D7DB9, #8B5CF6);
+  border-radius: 8px;
+  transition: width 0.5s ease;
+}
+
+.sharedProgressComplete {
+  background: linear-gradient(90deg, #15A862, #5EE093) !important;
+}
+
+.sharedEmptyActivities {
+  text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+}
+
+.sharedEmptyActivities .emptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* --- Edit controls on shared page --- */
+.addActivityBtnShared {
+  width: 100%;
+  padding: 13px;
+  background: white;
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6D7DB9;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.addActivityBtnShared:hover {
+  border-color: #6D7DB9;
+  background: #f5f3ff;
+}
+
+/* --- Live indicator --- */
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #15A862;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  background: #15A862;
+  border-radius: 50%;
+  animation: livePulse 1.5s ease infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* --- Guest Name Prompt --- */
+.guestPrompt {
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+  margin-bottom: 24px;
+  animation: modalSlideUp 0.3s ease;
+}
+
+.guestPromptTitle {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.guestPromptSub {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.guestInput {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.guestInput:focus {
+  border-color: #6D7DB9;
+  box-shadow: 0 0 0 3px rgba(109,125,185,0.15);
+}
+
+.guestSubmitBtn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #4A90D9, #6D7DB9);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.guestSubmitBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
+}
+
+/* --- Error & Loading States --- */
+.sharedError {
+  text-align: center;
+  padding: 60px 24px;
+  color: white;
+}
+
+.sharedError h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+.sharedError p {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.sharedLoading {
+  text-align: center;
+  padding: 80px 24px;
+  color: white;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .shareModal {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 95vh;
+  }
+
+  .shareBody {
+    padding: 18px 18px;
+  }
+
+  .shareHeader {
+    padding: 18px 18px 16px;
+  }
+
+  .sharedContent {
+    padding: 20px 14px 80px;
+  }
+
+  .sharedEventHeader {
+    padding: 20px 20px;
+  }
+
+  .sharedEventTitle {
+    font-size: 22px;
+  }
+
+  .sharedInfoGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .sharedTimelineBody {
+    padding: 16px 16px;
+  }
+
+  .sharedNavActions {
+    flex-direction: column;
+  }
+
+  .navActionBtn {
+    width: 100%;
+    justify-content: center;
+  }
+}
