@@ -1,6 +1,6 @@
 .overview {
   color: #ffffff;
-  padding: 2rem;
+  padding: 1rem;
   position: relative;
 }
 
@@ -9,18 +9,24 @@
   margin-bottom: 0.5rem;
 }
 
+.weatherContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .temperatureContainer{
   width: 200px;
-  height: 150px;
-  background-color: #FFF8F814;
+  height: 170px;
+  background-color: #7fc3e64D;
   border-radius: 15;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  margin-top: 2rem;
   margin-left: 2rem;
+  padding: 1rem 0;
 }
 
 .location_and_date {
@@ -39,9 +45,6 @@
 }
 
 .metrics {
-  position: absolute;
-  top: 3rem;
-  right: 2rem;
   text-align: right;
   font-size: 0.9rem;
   line-height: 1.6;
@@ -57,7 +60,7 @@
 .metricsContainer{
   width: 200px;
   height: 50px;
-  background-color: #FFF8F825;
+  background-color: #7fc3e64D;
   border-radius: 15;
   display: flex;
   flex-direction: column;
@@ -77,6 +80,9 @@
 }
 
 @media (max-width: 768px) {
+  .overview {
+    padding: 1rem;
+  }
   .greeting {
     font-size: 1.5rem;
   }
@@ -105,7 +111,7 @@
   }
 
   .metrics {
-    top: 5rem;
+    top: 3rem;
     right: 1rem;
     min-width: 125px;
     min-height: 110px;

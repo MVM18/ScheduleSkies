@@ -163,7 +163,18 @@ export default function TrafficInfo() {
               </div>
             ))
           ) : (   
-          <div className={styles.empty_state}>No traffic information found.</div>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            gap: '8px',
+          }}>
+            <p style={{ fontSize: '12px', fontWeight: 600 }}>
+              No traffic information found...
+            </p>
+          </div>
         )}
       </div>
     </div>

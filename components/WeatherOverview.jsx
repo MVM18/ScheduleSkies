@@ -74,32 +74,34 @@ export default function WeatherOverview({ username = 'User', weather = {} }) {
   return (
     <div className={styles.overview}>
       <h1 className={styles.greeting}>Welcome Back, {username}</h1>
-      <div className={styles.temperatureContainer}>
-        {loading ? (
-          <div className="spinner-container">
-            <div className="loading-spinner"></div>
-          </div>
-        ) : (
+      <div className={styles.weatherContainer}>
+        <div className={styles.temperatureContainer}>
+          {loading ? (
+            <div className="spinner-container">
+              <div className="loading-spinner"></div>
+            </div>
+          ) : (
+            <>
+              <p className={styles.location_and_date}>{weatherData.location}</p>
+              <p className={styles.location_and_date}>{formattedDate}</p>
+              <div className={styles.temperature}>{weatherData.temperature}°C</div>
+              <p className={styles.feels}>Feels like {weatherData.feelsLike}°C</p>
+            </>
+          )}
+        </div>
+        <div className={styles.metrics}>
+          {loading ? (
+            <div className="spinner-container">
+              <div className="loading-spinner"></div>
+            </div>
+          ) : (
           <>
-            <p className={styles.location_and_date}>{weatherData.location}</p>
-            <p className={styles.location_and_date}>{formattedDate}</p>
-            <div className={styles.temperature}>{weatherData.temperature}°C</div>
-            <p className={styles.feels}>Feels like {weatherData.feelsLike}°C</p>
+            <div className={styles.metricsContainer}>Humidity: {weatherData.humidity}%</div>
+            <div className={styles.metricsContainer}>Precipitation: {weatherData.precipitation} mm</div>
+            <div className={styles.metricsContainer}>Wind: {weatherData.windSpeed} km/h</div>
           </>
-        )}
-      </div>
-      <div className={styles.metrics}>
-        {loading ? (
-          <div className="spinner-container">
-            <div className="loading-spinner"></div>
-          </div>
-        ) : (
-        <>
-          <div className={styles.metricsContainer}>Humidity: {weatherData.humidity}%</div>
-          <div className={styles.metricsContainer}>Precipitation: {weatherData.precipitation} mm</div>
-          <div className={styles.metricsContainer}>Wind: {weatherData.windSpeed} km/h</div>
-        </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

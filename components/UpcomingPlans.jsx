@@ -14,7 +14,8 @@ export default function UpcomingPlans({ plans = [] }) {
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .order('date', { ascending: true });
+      .order('date', { ascending: true })
+      .gte('start_datetime', new Date().toISOString());
 
     if (data && !error) {
       setEventData(data);
@@ -42,35 +43,22 @@ export default function UpcomingPlans({ plans = [] }) {
   };
 
 
-  function formatTwelveHour(timeString) {
-    if (!timeString) return '—';
-    const parts = timeString.split(':');
-    if (parts.length < 2) return timeString;
-    let hours = parseInt(parts[0]);
-    const minutes = parts[1];
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    return `${hours}:${minutes} ${ampm}`;
-  }
+  function formatDateTime(datetime) {
+    const d = new Date(datetime);
 
-  function formatDate(date) {
-    if (!date) return '—';
-    const dateObj = new Date(`${date}T00:00:00`);
-    if (isNaN(dateObj)) return '—';
-    return dateObj.toLocaleDateString('en-US', {
+    const date = d.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
-  }
 
-  function getEventTime(event) {
-    if (event.time) return event.time;
-    if (event.start_datetime) {
-      const d = new Date(event.start_datetime);
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    }
-    return null;
+    const time = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    return { date, time };
   }
 
   function getEventDistance(event) {
@@ -103,12 +91,13 @@ export default function UpcomingPlans({ plans = [] }) {
         <ul className={styles.list}>
           {eventData.map((event) => {
             const distance = getEventDistance(event);
+            const { date, time } = formatDateTime(event.start_datetime);
             return (
               <li key={event.id} className={styles.plan}>
                 <div className={styles.event}>
                   <div className={styles.date_and_time}>
-                    <div className={styles.date}>{formatDate(event.date)}</div>
-                    <div className={styles.time}>{formatTwelveHour(getEventTime(event))}</div>
+                    <div className={styles.date}>{date}</div>
+                    <div className={styles.time}>{time}</div>
                   </div>
                   <div className={styles.title_and_location}>
                     <div className={styles.title}>{event.title}</div>
@@ -123,7 +112,18 @@ export default function UpcomingPlans({ plans = [] }) {
           })}
         </ul>
       ) : (
-        <div className={styles.empty_state}>No upcoming plans found.</div>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            gap: '8px',
+          }}>
+            <p style={{ fontSize: '12px', fontWeight: 600 }}>
+              No upcoming plans found...
+            </p>
+          </div>
       )}
     </div>
   );

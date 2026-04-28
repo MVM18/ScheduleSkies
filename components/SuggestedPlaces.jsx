@@ -121,9 +121,8 @@ export default function SuggestedPlaces({ places = [] }) {
             textAlign: 'center',
             gap: '8px',
           }}>
-            <span style={{ fontSize: '32px' }}>📍</span>
-            <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
-              No places found nearby
+            <p style={{ fontSize: '12px', fontWeight: 600 }}>
+              No places found nearby...
             </p>
           </div>
         ) : (
