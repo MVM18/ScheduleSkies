@@ -72,11 +72,12 @@ async function reverseGeocodeLatLng(lat, lng) {
   }
 }
 
-// Weather Widget Component
-function WeatherWidget({ location }) {
+// Weather Widget Component (responsive)
+function WeatherWidget({ location, isMobile }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const fetchWeather = useCallback(async (lat, lon) => {
     setLoading(true);
@@ -148,7 +149,7 @@ function WeatherWidget({ location }) {
         display: 'flex',
         alignItems: 'center',
         backgroundColor: 'white',
-        padding: '8px 14px',
+        padding: isMobile ? '6px 12px' : '8px 14px',
         borderRadius: '25px',
         gap: '8px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
@@ -156,7 +157,7 @@ function WeatherWidget({ location }) {
         opacity: 0.7
       }}>
         <span>⏳</span>
-        <span style={{ fontWeight: '600', color: '#333', fontSize: '13px' }}>Loading weather...</span>
+        <span style={{ fontWeight: '600', color: '#333', fontSize: isMobile ? '11px' : '13px' }}>Loading weather...</span>
       </div>
     );
   }
@@ -167,26 +168,26 @@ function WeatherWidget({ location }) {
         display: 'flex',
         alignItems: 'center',
         backgroundColor: 'white',
-        padding: '8px 14px',
+        padding: isMobile ? '6px 12px' : '8px 14px',
         borderRadius: '25px',
         gap: '8px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
         whiteSpace: 'nowrap'
       }}>
         <span>🌤️</span>
-        <span style={{ fontWeight: '600', color: '#333', fontSize: '13px' }}>--°C · Weather</span>
+        <span style={{ fontWeight: '600', color: '#333', fontSize: isMobile ? '11px' : '13px' }}>--°C · Weather</span>
       </div>
     );
   }
 
-  return (
+  const widgetContent = (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       background: getWeatherBackground(weather.condition),
-      padding: '8px 14px',
+      padding: isMobile ? '6px 12px' : '8px 14px',
       borderRadius: '25px',
-      gap: '10px',
+      gap: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
       whiteSpace: 'nowrap',
       color: weather.condition === 'Snow' ? '#333' : 'white',
@@ -197,34 +198,50 @@ function WeatherWidget({ location }) {
       onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
       title={`${weather.description} • Humidity: ${weather.humidity}% • Wind: ${weather.windSpeed} km/h`}
     >
-      <span style={{ fontSize: '20px' }}>{getWeatherIcon(weather.condition)}</span>
+      <span style={{ fontSize: isMobile ? '16px' : '20px' }}>{getWeatherIcon(weather.condition)}</span>
+      {(!isMobile || isExpanded) && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: '700', fontSize: isMobile ? '12px' : '14px' }}>
+              {weather.temp}°C
+            </span>
+            <span style={{ fontSize: isMobile ? '8px' : '10px', opacity: 0.9 }}>
+              Feels {weather.feelsLike}°C
+            </span>
+          </div>
+          <div style={{
+            width: '1px',
+            height: '20px',
+            background: 'rgba(255,255,255,0.3)',
+            margin: '0 2px'
+          }} />
+        </>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontWeight: '700', fontSize: '14px' }}>
-          {weather.temp}°C
-        </span>
-        <span style={{ fontSize: '10px', opacity: 0.9 }}>
-          Feels {weather.feelsLike}°C
-        </span>
-      </div>
-      <div style={{
-        width: '1px',
-        height: '25px',
-        background: 'rgba(255,255,255,0.3)',
-        margin: '0 2px'
-      }} />
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontSize: '11px', fontWeight: '600' }}>
+        <span style={{ fontSize: isMobile && !isExpanded ? '10px' : '11px', fontWeight: '600' }}>
           {weather.condition}
         </span>
-        <span style={{ fontSize: '9px', opacity: 0.9 }}>
-          {weather.location || 'Current Location'}
-        </span>
+        {(!isMobile || isExpanded) && (
+          <span style={{ fontSize: isMobile ? '7px' : '9px', opacity: 0.9 }}>
+            {weather.location || 'Current Location'}
+          </span>
+        )}
       </div>
     </div>
   );
+
+  if (isMobile && !isExpanded) {
+    return (
+      <div onClick={() => setIsExpanded(!isExpanded)}>
+        {widgetContent}
+      </div>
+    );
+  }
+
+  return widgetContent;
 }
 
-function SearchInput({ placeholder, value, onChange, onSelect, icon }) {
+function SearchInput({ placeholder, value, onChange, onSelect, icon, isMobile }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef(null);
@@ -255,13 +272,13 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon }) {
 
   return (
     <div style={{ position: 'relative', flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: '12px', padding: '8px 12px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', gap: '8px' }}>
-        <span style={{ fontSize: '15px' }}>{icon}</span>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: '12px', padding: isMobile ? '6px 10px' : '8px 12px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', gap: '8px' }}>
+        <span style={{ fontSize: isMobile ? '13px' : '15px' }}>{icon}</span>
         <input
           value={value}
           onChange={handleChange}
           placeholder={placeholder}
-          style={{ border: 'none', outline: 'none', fontSize: '13px', flex: 1, color: '#1A365D', background: 'transparent' }}
+          style={{ border: 'none', outline: 'none', fontSize: isMobile ? '11px' : '13px', flex: 1, color: '#1A365D', background: 'transparent' }}
         />
         {loading && <span style={{ fontSize: '11px', color: '#aaa' }}>⏳</span>}
       </div>
@@ -269,7 +286,7 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon }) {
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999, background: 'white', borderRadius: '12px', marginTop: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
           {suggestions.map((s, i) => (
             <div key={i} onClick={() => handleSelect(s)}
-              style={{ padding: '10px 14px', fontSize: '12px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none', color: '#333' }}
+              style={{ padding: isMobile ? '8px 12px' : '10px 14px', fontSize: isMobile ? '11px' : '12px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none', color: '#333' }}
               onMouseEnter={e => e.currentTarget.style.background = '#EBF4FF'}
               onMouseLeave={e => e.currentTarget.style.background = 'white'}
             >📍 {s.properties.formatted}</div>
@@ -341,8 +358,8 @@ const getRouteSegmentsWithTraffic = (routeCoords) => {
   return segments;
 };
 
-// Custom map controls component
-function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
+// Custom map controls component (responsive)
+function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute, isMobile }) {
   const map = useMap();
 
   const handleZoomIn = () => {
@@ -366,8 +383,8 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
   return (
     <div style={{
       position: 'absolute',
-      right: '14px',
-      top: '14px',
+      right: isMobile ? '10px' : '14px',
+      top: isMobile ? '10px' : '14px',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
@@ -377,13 +394,13 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
         onClick={handleZoomIn}
         style={{
           backgroundColor: 'white',
-          width: '38px',
-          height: '38px',
+          width: isMobile ? '32px' : '38px',
+          height: isMobile ? '32px' : '38px',
           borderRadius: '8px',
           border: '1px solid #ddd',
           cursor: 'pointer',
           boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-          fontSize: '18px',
+          fontSize: isMobile ? '16px' : '18px',
           fontWeight: 'bold',
           display: 'flex',
           alignItems: 'center',
@@ -396,13 +413,13 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
         onClick={handleZoomOut}
         style={{
           backgroundColor: 'white',
-          width: '38px',
-          height: '38px',
+          width: isMobile ? '32px' : '38px',
+          height: isMobile ? '32px' : '38px',
           borderRadius: '8px',
           border: '1px solid #ddd',
           cursor: 'pointer',
           boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-          fontSize: '18px',
+          fontSize: isMobile ? '16px' : '18px',
           fontWeight: 'bold',
           display: 'flex',
           alignItems: 'center',
@@ -416,13 +433,13 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
         onClick={handleLocation}
         style={{
           backgroundColor: 'white',
-          width: '38px',
-          height: '38px',
+          width: isMobile ? '32px' : '38px',
+          height: isMobile ? '32px' : '38px',
           borderRadius: '8px',
           border: '1px solid #ddd',
           cursor: 'pointer',
           boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-          fontSize: '16px',
+          fontSize: isMobile ? '14px' : '16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -434,13 +451,13 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute }) {
         onClick={handleRoute}
         style={{
           backgroundColor: 'white',
-          width: '38px',
-          height: '38px',
+          width: isMobile ? '32px' : '38px',
+          height: isMobile ? '32px' : '38px',
           borderRadius: '8px',
           border: '1px solid #ddd',
           cursor: 'pointer',
           boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-          fontSize: '16px',
+          fontSize: isMobile ? '14px' : '16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -616,6 +633,11 @@ const MapScreen = ({
   returnPath = '/plan',
 }) => {
   const router = useRouter();
+  const [isMobile, setIsMobile] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(true);
+  const [showPlacesPanel, setShowPlacesPanel] = useState(true);
+  const [showItineraryPanel, setShowItineraryPanel] = useState(true);
+  
   const [pickedPoint, setPickedPoint] = useState(null);
   const [pickedLabel, setPickedLabel] = useState('');
   const [pickLoading, setPickLoading] = useState(false);
@@ -651,6 +673,16 @@ const MapScreen = ({
   // Itinerary waypoints state
   const [waypointsList, setWaypointsList] = useState([]);
   const [currentWaypointIndex, setCurrentWaypointIndex] = useState(0);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Auto-navigate to venue when venueCoords prop is provided (from itinerary)
   useEffect(() => {
@@ -998,588 +1030,446 @@ const MapScreen = ({
     { key: 'hotel', label: 'Hotels', icon: '🏨' },
   ];
 
-  return (
-    <div style={{
-      height: '100%',
-      width: '100%',
-      display: 'flex',
-      fontFamily: "'Segoe UI', sans-serif",
-      overflow: 'hidden',
-      position: 'relative',
-      pointerEvents: 'none'
-    }}>
+  // --- Shared map content (both desktop and mobile) ---
+  const mapContent = (
+    <>
+      <TileLayer
+        url={`https://maps.geoapify.com/v1/tile/${mapStyle}/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`}
+        attribution='Powered by Geoapify | OpenStreetMap'
+      />
+      {flyTo && <FlyTo coords={flyTo} />}
+      {pickMode && <MapPickClickHandler enabled={pickMode} onLatLngClick={handlePickMapClick} />}
+      <MapControls
+        onZoomIn={() => {}}
+        onZoomOut={() => {}}
+        onLocation={getUserLocation}
+        onRoute={() => fetchRoute(origin || userLocation, destination, routeMode, false)}
+        isMobile={isMobile}
+      />
+      {pickMode && pickedPoint && (
+        <Marker position={[pickedPoint.lat, pickedPoint.lng]} icon={destIcon}>
+          <Popup>
+            <strong>Pinned location</strong>
+            <br />
+            {pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`}
+          </Popup>
+        </Marker>
+      )}
+      {userLocation && !origin && !pickMode && (
+        <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
+          <Popup><strong>Your Location</strong></Popup>
+        </Marker>
+      )}
+      {!pickMode && origin && (
+        <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
+          <Popup><strong>Origin</strong><br />{origin.label}</Popup>
+        </Marker>
+      )}
+      {!pickMode && destination && (
+        <Marker position={[destination.lat, destination.lng]} icon={destIcon}>
+          <Popup>
+            <strong>Destination</strong><br />
+            {destination.label}
+            {isRerouted && <div style={{ color: '#FF9800', marginTop: '5px' }}>Rerouted</div>}
+          </Popup>
+        </Marker>
+      )}
+      {!pickMode && routeSegments.map((segment, idx) => (
+        <Polyline
+          key={idx}
+          positions={[segment.start, segment.end]}
+          pathOptions={{ color: segment.color, weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }}
+        />
+      ))}
+      {!pickMode && !isRerouted && getFilteredPlaces().map((place, idx) => (
+        <Marker
+          key={idx}
+          position={[place.lat, place.lng]}
+          icon={L.divIcon({
+            className: '',
+            html: `<div style="
+              width: 28px; height: 28px; background: ${place.type === 'restaurant' ? '#FF5722' : place.type === 'parking' ? '#2196F3' : place.type === 'hotel' ? '#9C27B0' : '#9C27B0'};
+              border: 2px solid white; border-radius: 50%;
+              display: flex; align-items: center; justify-content: center;
+              font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              cursor: pointer;
+            ">${getPlaceIcon(place.type)}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          })}
+        >
+          <Popup>
+            <strong>{place.name}</strong><br />
+            {place.rating && <span>⭐ Rating: {place.rating}/5<br /></span>}
+            <span>Type: {place.type}<br /></span>
+            {place.address && <span>{place.address}<br /></span>}
+            <span>Distance: {place.distance}m</span><br />
+            <button
+              onClick={() => handleRerouteToPlace(place)}
+              style={{ marginTop: '8px', padding: '5px 10px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}
+            >
+              Reroute Here
+            </button>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '12px',
-        gap: '10px',
-        minWidth: 0,
-        overflow: 'hidden',
-        paddingLeft: '10px',
-        marginRight: !pickMode && nearbyPlaces.length > 0 ? '40px' : '0',
-        pointerEvents: 'auto'
-      }}>
-
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', flexShrink: 0, zIndex: 2 }}>
-          {pickMode ? (
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '14px 16px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', marginBottom: '8px' }}>
-                📍 Pin your {pickContext === 'activity' ? 'activity' : 'event'} location
-              </div>
-              <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px', lineHeight: 1.45 }}>
-                Tap anywhere on the map to place or move the pin. The address field will use this location.
-                {pickHintLabel ? (
-                  <span style={{ display: 'block', marginTop: '6px', fontSize: '11px', opacity: 0.85 }}>
-                    Hint: {pickHintLabel}
-                  </span>
-                ) : null}
-              </p>
-              {pickLoading && <div style={{ fontSize: '11px', color: '#718096', marginBottom: '8px' }}>Resolving address…</div>}
-              {pickedLabel && (
-                <div style={{ fontSize: '11px', color: '#2C5282', marginBottom: '10px', padding: '8px 10px', background: '#EBF8FF', borderRadius: '10px', maxHeight: '72px', overflowY: 'auto' }}>
-                  {pickedLabel}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={confirmPick}
-                  disabled={!pickedPoint || pickLoading}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: !pickedPoint || pickLoading ? '#A0AEC0' : '#15A862',
-                    color: 'white',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: !pickedPoint || pickLoading ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Use this location
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelPick}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid #CBD5E0',
-                    background: 'white',
-                    color: '#4A5568',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={getUserLocation}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: '#2C5282',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    marginLeft: 'auto',
-                  }}
-                >
-                  My location
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Weather and Traffic stacked vertically */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
-                <WeatherWidget location={weatherLocation} />
-                
-                {/* Traffic Card - moved below weather with same size and design */}
-                {trafficSummary && routeInfo && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '8px 14px',
-                    borderRadius: '25px',
-                    gap: '10px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    whiteSpace: 'nowrap',
-                    background: trafficSummary.level === 'Heavy' ? 'linear-gradient(135deg, #FF5252, #C62828)' : 
-                               trafficSummary.level === 'Moderate' ? 'linear-gradient(135deg, #FFB74D, #F57F17)' : 
-                               'linear-gradient(135deg, #66BB6A, #4CAF50)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s',
-                    minWidth: '200px'
-                  }}
+  // --- DESKTOP LAYOUT (unchanged, with map container border and side panels) ---
+  if (!isMobile) {
+    return (
+      <div style={{ height: '100%', width: '100%', display: 'flex', fontFamily: "'Segoe UI', sans-serif", overflow: 'hidden', position: 'relative', pointerEvents: 'none' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px', gap: '10px', minWidth: 0, overflow: 'hidden', pointerEvents: 'auto' }}>
+          {/* Top row: Weather, Traffic, Search inputs */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', flexShrink: 0, zIndex: 2 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+              <WeatherWidget location={weatherLocation} isMobile={false} />
+              {trafficSummary && routeInfo && (
+                <div style={{ display: 'flex', alignItems: 'center', padding: '8px 14px', borderRadius: '25px', gap: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap', background: trafficSummary.level === 'Heavy' ? 'linear-gradient(135deg, #FF5252, #C62828)' : trafficSummary.level === 'Moderate' ? 'linear-gradient(135deg, #FFB74D, #F57F17)' : 'linear-gradient(135deg, #66BB6A, #4CAF50)', color: 'white', cursor: 'pointer', transition: 'transform 0.2s', minWidth: '200px' }}
                   onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                   title={`${trafficSummary.heavySegments} heavy • ${trafficSummary.moderateSegments} moderate • ${trafficSummary.lightSegments} light`}
-                  >
-                    <span style={{ fontSize: '20px' }}>
-                      {trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: '700', fontSize: '14px' }}>
-                        {trafficSummary.level} Traffic
-                      </span>
-                      <span style={{ fontSize: '10px', opacity: 0.9 }}>
-                        Delay: {routeInfo.trafficDelay} min
-                      </span>
-                    </div>
-                    <div style={{
-                      width: '1px',
-                      height: '25px',
-                      background: 'rgba(255,255,255,0.3)',
-                      margin: '0 2px'
-                    }} />
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '600' }}>
-                        {routeInfo.adjustedTime} min total
-                      </span>
-                      <span style={{ fontSize: '9px', opacity: 0.9 }}>
-                        {routeInfo.distance} km
-                      </span>
-                    </div>
+                >
+                  <span style={{ fontSize: '20px' }}>{trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: '700', fontSize: '14px' }}>{trafficSummary.level} Traffic</span>
+                    <span style={{ fontSize: '10px', opacity: 0.9 }}>Delay: {routeInfo.trafficDelay} min</span>
+                  </div>
+                  <div style={{ width: '1px', height: '25px', background: 'rgba(255,255,255,0.3)', margin: '0 2px' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '600' }}>{routeInfo.adjustedTime} min total</span>
+                    <span style={{ fontSize: '9px', opacity: 0.9 }}>{routeInfo.distance} km</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <SearchInput placeholder="From — origin location" value={originText} onChange={setOriginText} onSelect={handleOriginSelect} icon="🟦" isMobile={false} />
+                  <button onClick={getUserLocation} style={{ padding: '8px 12px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>My Location</button>
+                </div>
+                <SearchInput placeholder="To — destination" value={destText} onChange={setDestText} onSelect={handleDestSelect} icon="🔴" isMobile={false} />
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  {modeOptions.map(({ key, icon, label }) => (
+                    <button key={key} onClick={() => setRouteMode(key)} title={label}
+                      style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '15px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.12)' : 'scale(1)' }}
+                    >{icon}</button>
+                  ))}
+                  <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
+                    style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '13px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
+                  >{isRouting ? 'Routing...' : 'Go'}</button>
+                  {isRerouted && <button onClick={undoReroute} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FF9800', color: 'white', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Undo</button>}
+                  {(origin || destination || routeCoords) && <button onClick={clearAll} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>}
+                </div>
+                {routeError && <div style={{ fontSize: '12px', color: '#E53E3E', padding: '5px 10px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
+                {routeInfo && (
+                  <div style={{ display: 'flex', gap: '12px', padding: '7px 12px', background: '#EBF8FF', borderRadius: '10px', fontSize: '12px', fontWeight: '700', color: '#2C5282' }}>
+                    <span>📏 {routeInfo.distance} km</span>
+                    <span>⏱ Base: {routeInfo.time} min</span>
+                    <span>⏱ Est: {routeInfo.adjustedTime} min</span>
                   </div>
                 )}
               </div>
-
-              <div style={{ flex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px 14px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', minWidth: '280px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <SearchInput
-                      placeholder="From — origin location"
-                      value={originText}
-                      onChange={setOriginText}
-                      onSelect={handleOriginSelect}
-                      icon="🟦"
-                    />
-                    <button
-                      onClick={getUserLocation}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        background: '#2C5282',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      My Location
-                    </button>
-                  </div>
-
-                  <SearchInput
-                    placeholder="To — destination"
-                    value={destText}
-                    onChange={setDestText}
-                    onSelect={handleDestSelect}
-                    icon="🔴"
-                  />
-
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {modeOptions.map(({ key, icon, label }) => (
-                      <button key={key} onClick={() => setRouteMode(key)} title={label}
-                        style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '15px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.12)' : 'scale(1)' }}
-                      >{icon}</button>
-                    ))}
-                    <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
-                      style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '13px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
-                    >{isRouting ? 'Routing...' : 'Go'}</button>
-
-                    {isRerouted && (
-                      <button onClick={undoReroute}
-                        style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FF9800', color: 'white', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}
-                      >
-                        Undo
-                      </button>
-                    )}
-
-                    {(origin || destination || routeCoords) && (
-                      <button onClick={clearAll} style={{ padding: '7px 10px', borderRadius: '10px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '12px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>
-                    )}
-                  </div>
-
-                  {routeError && <div style={{ fontSize: '12px', color: '#E53E3E', padding: '5px 10px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
-
-                  {routeInfo && (
-                    <div style={{ display: 'flex', gap: '12px', padding: '7px 12px', background: '#EBF8FF', borderRadius: '10px', fontSize: '12px', fontWeight: '700', color: '#2C5282' }}>
-                      <span>📏 {routeInfo.distance} km</span>
-                      <span>⏱ Base: {routeInfo.time} min</span>
-                      <span>⏱ Est: {routeInfo.adjustedTime} min</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
-          <div style={{ background: 'white', borderRadius: '12px', padding: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', zIndex: 2, flexShrink: 0 }}>
-            <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '6px', color: '#666' }}>Filter places:</div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {placeFilterOptions.map(option => (
-                <button
-                  key={option.key}
-                  onClick={() => setPlaceTypeFilter(option.key)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '15px',
-                    border: 'none',
-                    background: placeTypeFilter === option.key ? '#2C5282' : '#EDF2F7',
-                    color: placeTypeFilter === option.key ? 'white' : '#333',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  {option.icon} {option.label}
-                </button>
-              ))}
             </div>
           </div>
-        )}
-
-        <div style={{ flex: 1, borderRadius: '24px', border: '6px solid #2C5282', overflow: 'hidden', position: 'relative', minHeight: 0, zIndex: 1 }}>
-          <MapContainer
-            center={defaultPosition}
-            zoom={14}
-            style={{ height: '100%', width: '100%' }}
-            zoomControl={false}
-          >
-            <TileLayer
-              url={`https://maps.geoapify.com/v1/tile/${mapStyle}/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`}
-              attribution='Powered by Geoapify | OpenStreetMap'
-            />
-            {flyTo && <FlyTo coords={flyTo} />}
-
-            {pickMode && (
-              <MapPickClickHandler enabled={pickMode} onLatLngClick={handlePickMapClick} />
-            )}
-
-            <MapControls
-              onZoomIn={() => { }}
-              onZoomOut={() => { }}
-              onLocation={getUserLocation}
-              onRoute={() => fetchRoute(origin || userLocation, destination, routeMode, false)}
-            />
-
-            {pickMode && pickedPoint && (
-              <Marker position={[pickedPoint.lat, pickedPoint.lng]} icon={destIcon}>
-                <Popup>
-                  <strong>Pinned location</strong>
-                  <br />
-                  {pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`}
-                </Popup>
-              </Marker>
-            )}
-
-            {userLocation && !origin && !pickMode && (
-              <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
-                <Popup><strong>Your Location</strong></Popup>
-              </Marker>
-            )}
-
-            {!pickMode && origin && <Marker position={[origin.lat, origin.lng]} icon={originIcon}><Popup><strong>Origin</strong><br />{origin.label}</Popup></Marker>}
-
-            {!pickMode && destination && <Marker position={[destination.lat, destination.lng]} icon={destIcon}>
-              <Popup>
-                <strong>Destination</strong><br />
-                {destination.label}
-                {isRerouted && <div style={{ color: '#FF9800', marginTop: '5px' }}>Rerouted</div>}
-              </Popup>
-            </Marker>}
-
-            {!pickMode && routeSegments.map((segment, idx) => (
-              <Polyline
-                key={idx}
-                positions={[segment.start, segment.end]}
-                pathOptions={{
-                  color: segment.color,
-                  weight: 6,
-                  opacity: 0.9,
-                  lineCap: 'round',
-                  lineJoin: 'round'
-                }}
-              />
-            ))}
-
-            {!pickMode && !isRerouted && getFilteredPlaces().map((place, idx) => (
-              <Marker
-                key={idx}
-                position={[place.lat, place.lng]}
-                icon={L.divIcon({
-                  className: '',
-                  html: `<div style="
-                    width: 28px; height: 28px; background: ${place.type === 'restaurant' ? '#FF5722' : place.type === 'parking' ? '#2196F3' : place.type === 'hotel' ? '#9C27B0' : '#9C27B0'};
-                    border: 2px solid white; border-radius: 50%;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                    cursor: pointer;
-                  ">${getPlaceIcon(place.type)}</div>`,
-                  iconSize: [28, 28],
-                  iconAnchor: [14, 14],
-                })}
-              >
-                <Popup>
-                  <strong>{place.name}</strong><br />
-                  {place.rating && <span>⭐ Rating: {place.rating}/5<br /></span>}
-                  <span>Type: {place.type}<br /></span>
-                  {place.address && <span>{place.address}<br /></span>}
-                  <span>Distance: {place.distance}m</span><br />
-                  <button
-                    onClick={() => handleRerouteToPlace(place)}
-                    style={{
-                      marginTop: '8px',
-                      padding: '5px 10px',
-                      background: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer',
-                      fontSize: '11px'
-                    }}
-                  >
-                    Reroute Here
-                  </button>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-
-          {isLoadingPlaces && (
-            <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', zIndex: 1000 }}>
-              Finding places along your route...
+          {/* Filter places bar (if any) */}
+          {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
+            <div style={{ background: 'white', borderRadius: '12px', padding: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', zIndex: 2, flexShrink: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '6px', color: '#666' }}>Filter places:</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {placeFilterOptions.map(option => (
+                  <button key={option.key} onClick={() => setPlaceTypeFilter(option.key)}
+                    style={{ padding: '4px 10px', borderRadius: '15px', border: 'none', background: placeTypeFilter === option.key ? '#2C5282' : '#EDF2F7', color: placeTypeFilter === option.key ? 'white' : '#333', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >{option.icon} {option.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Map container with border */}
+          <div style={{ flex: 1, borderRadius: '24px', border: '6px solid #2C5282', overflow: 'hidden', position: 'relative', minHeight: 0, zIndex: 1 }}>
+            <MapContainer center={defaultPosition} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+              {mapContent}
+            </MapContainer>
+          </div>
+        </div>
+        {/* Right side panels: Places and Itinerary */}
+        <div style={{ display: 'flex', gap: '12px', padding: '12px', pointerEvents: 'auto' }}>
+          {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
+            <div style={{ width: '280px', backgroundColor: '#81D4FA', padding: '14px', display: 'flex', flexDirection: 'column', overflowY: 'auto', gap: '8px', flexShrink: 0, borderRadius: '18px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', pointerEvents: 'auto' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', margin: '0 0 4px', textAlign: 'center' }}>Places Along Route</h3>
+              <p style={{ fontSize: '10px', color: '#2C5282', textAlign: 'center', margin: '0 0 6px', opacity: 0.8 }}>{getFilteredPlaces().length} places found</p>
+              {getFilteredPlaces().map((place, i) => (
+                <div key={i} style={{ backgroundColor: 'white', borderRadius: '14px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'pointer', transition: 'all 0.18s', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '45px', height: '40px', borderRadius: '10px', background: '#EDF2F7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>{getPlaceIcon(place.type)}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#1A365D', marginBottom: '4px' }}>{place.name}</div>
+                      <div style={{ fontSize: '10px', color: '#666', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}><span>{place.type}</span>{place.rating && <span>⭐ {place.rating}</span>}<span>{place.distance}m</span></div>
+                    </div>
+                  </div>
+                  <button onClick={() => handleRerouteToPlace(place)} style={{ padding: '6px 10px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', width: '100%' }}>Reroute Here</button>
+                </div>
+              ))}
+              {isRerouted && reroutedPlace && (
+                <div style={{ marginTop: '12px', padding: '12px', background: '#FFF3E0', borderRadius: '12px', border: '1px solid #FF9800' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#E65100', marginBottom: '8px' }}>Currently Rerouted</div>
+                  <div style={{ fontSize: '11px', color: '#BF360C', marginBottom: '8px' }}>To: <strong>{reroutedPlace.name}</strong></div>
+                  <button onClick={undoReroute} style={{ padding: '6px 12px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', width: '100%' }}>Undo</button>
+                </div>
+              )}
+            </div>
+          )}
+          {!pickMode && waypointsList.length > 0 && (
+            <div style={{ width: '280px', backgroundColor: '#EDE7F6', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0, borderRadius: '18px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', overflowY: 'auto', pointerEvents: 'auto' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#4A148C', margin: '0 0 4px', textAlign: 'center' }}>🗺️ Itinerary Navigation</h3>
+              <p style={{ fontSize: '10px', color: '#6A1B9A', textAlign: 'center', margin: '0 0 8px', opacity: 0.8 }}>Stop {currentWaypointIndex + 1} of {waypointsList.length}</p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+                {waypointsList.map((_, i) => (
+                  <div key={i} style={{ width: i === currentWaypointIndex ? '20px' : '8px', height: '8px', borderRadius: '4px', background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9', transition: 'all 0.3s ease' }}></div>
+                ))}
+              </div>
+              {waypointsList.map((wp, i) => (
+                <div key={i} style={{ backgroundColor: i === currentWaypointIndex ? 'white' : i < currentWaypointIndex ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)', borderRadius: '12px', padding: '10px', border: i === currentWaypointIndex ? '2px solid #AB47BC' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s', opacity: i < currentWaypointIndex ? 0.6 : 1 }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{i < currentWaypointIndex ? '✓' : i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#1A365D', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{wp.label || wp.activityName || `Stop ${i + 1}`}</div>
+                    {wp.activityName && wp.label !== wp.activityName && <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{wp.activityName}</div>}
+                  </div>
+                </div>
+              ))}
+              {currentWaypointIndex < waypointsList.length - 1 && (
+                <button onClick={goToNextWaypoint} style={{ marginTop: '8px', padding: '10px', background: 'linear-gradient(135deg, #7B1FA2, #AB47BC)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>Next Stop →</button>
+              )}
+              {currentWaypointIndex === waypointsList.length - 1 && <div style={{ marginTop: '8px', padding: '10px', background: '#E8F5E9', borderRadius: '12px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: '#2E7D32' }}>✅ Final Destination Reached</div>}
             </div>
           )}
         </div>
       </div>
+    );
+  }
 
-      {/* Itinerary Waypoints Panel */}
-      {!pickMode && waypointsList.length > 0 && (
+  // --- MOBILE LAYOUT (full-screen map, weather+traffic side by side, toggles below) ---
+  return (
+    <div style={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, fontFamily: "'Segoe UI', sans-serif", overflow: 'hidden', pointerEvents: 'auto' }}>
+      {/* Fullscreen Map Container */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}>
+        <MapContainer center={defaultPosition} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+          {mapContent}
+        </MapContainer>
+      </div>
+
+      {/* Floating UI Elements - Mobile */}
+      <>
+        {/* Top row: Weather and Traffic (side by side, left-aligned) */}
         <div style={{
-          width: '280px',
-          backgroundColor: '#EDE7F6',
-          padding: '14px',
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          right: '10px',
+          zIndex: 1002,
+          pointerEvents: 'auto',
           display: 'flex',
-          flexDirection: 'column',
           gap: '8px',
-          flexShrink: 0,
-          position: 'relative',
-          zIndex: 2,
-          overflowY: 'auto',
-          pointerEvents: 'auto'
+          alignItems: 'center',
+          justifyContent: 'flex-start',  // ← changed from space-between to flex-start
+          flexWrap: 'wrap'               // allows wrapping on very small screens
         }}>
-          <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#4A148C', margin: '0 0 4px', textAlign: 'center' }}>
-            🗺️ Itinerary Navigation
-          </h3>
-          <p style={{ fontSize: '10px', color: '#6A1B9A', textAlign: 'center', margin: '0 0 8px', opacity: 0.8 }}>
-            Stop {currentWaypointIndex + 1} of {waypointsList.length}
-          </p>
-
-          {/* Progress dots */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
-            {waypointsList.map((_, i) => (
-              <div key={i} style={{
-                width: i === currentWaypointIndex ? '20px' : '8px',
-                height: '8px',
-                borderRadius: '4px',
-                background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9',
-                transition: 'all 0.3s ease'
-              }}></div>
-            ))}
-          </div>
-
-          {/* Waypoints list */}
-          {waypointsList.map((wp, i) => (
-            <div key={i} style={{
-              backgroundColor: i === currentWaypointIndex ? 'white' : i < currentWaypointIndex ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)',
-              borderRadius: '12px',
-              padding: '10px',
-              border: i === currentWaypointIndex ? '2px solid #AB47BC' : '1px solid transparent',
+          <WeatherWidget location={weatherLocation} isMobile={true} />
+          {trafficSummary && routeInfo && (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              transition: 'all 0.2s',
-              opacity: i < currentWaypointIndex ? 0.6 : 1
+              padding: '6px 12px',
+              borderRadius: '25px',
+              gap: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              background: trafficSummary.level === 'Heavy' ? 'linear-gradient(135deg, #FF5252, #C62828)' :
+                         trafficSummary.level === 'Moderate' ? 'linear-gradient(135deg, #FFB74D, #F57F17)' :
+                         'linear-gradient(135deg, #66BB6A, #4CAF50)',
+              color: 'white'
             }}>
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '50%',
-                background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '12px', fontWeight: '700', flexShrink: 0
-              }}>
-                {i < currentWaypointIndex ? '✓' : i + 1}
+              <span style={{ fontSize: '16px' }}>
+                {trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: '700', fontSize: '11px' }}>{trafficSummary.level}</span>
+                <span style={{ fontSize: '8px', opacity: 0.9 }}>+{routeInfo.trafficDelay} min</span>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#1A365D', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {wp.label || wp.activityName || `Stop ${i + 1}`}
-                </div>
-                {wp.activityName && wp.label !== wp.activityName && (
-                  <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{wp.activityName}</div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* Next Stop Button */}
-          {currentWaypointIndex < waypointsList.length - 1 && (
-            <button
-              onClick={goToNextWaypoint}
-              style={{
-                marginTop: '8px',
-                padding: '10px',
-                background: 'linear-gradient(135deg, #7B1FA2, #AB47BC)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '700',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              Next Stop →
-            </button>
-          )}
-
-          {currentWaypointIndex === waypointsList.length - 1 && (
-            <div style={{
-              marginTop: '8px',
-              padding: '10px',
-              background: '#E8F5E9',
-              borderRadius: '12px',
-              textAlign: 'center',
-              fontSize: '12px',
-              fontWeight: '700',
-              color: '#2E7D32'
-            }}>
-              ✅ Final Destination Reached
             </div>
           )}
         </div>
-      )}
 
-      {/* Places Along Route Panel */}
-      {!pickMode && nearbyPlaces.length > 0 && !isRerouted && (
-        <div style={{
-          width: '280px',
-          backgroundColor: '#81D4FA',
-          padding: '14px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          gap: '8px',
-          flexShrink: 0,
-          position: 'relative',
-          zIndex: 2,
-          pointerEvents: 'auto'
-        }}>
-          <h3 style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', margin: '0 0 4px', textAlign: 'center' }}>
-            Places Along Route
-          </h3>
-          <p style={{ fontSize: '10px', color: '#2C5282', textAlign: 'center', margin: '0 0 6px', opacity: 0.8 }}>
-            {getFilteredPlaces().length} places found
-          </p>
-
-          {getFilteredPlaces().map((place, i) => (
-            <div key={i}
+        {/* Toggle Buttons Row (below weather/traffic) */}
+        {!pickMode && (
+          <div style={{
+            position: 'absolute',
+            top: '80px',
+            left: '10px',
+            right: '10px',
+            zIndex: 1002,
+            pointerEvents: 'auto',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+          }}>
+            <button
+              onClick={() => setShowSearchPanel(!showSearchPanel)}
               style={{
-                backgroundColor: 'white',
-                borderRadius: '14px',
-                padding: '10px',
+                backgroundColor: showSearchPanel ? '#2C5282' : '#ffffff',
+                color: showSearchPanel ? 'white' : '#2C5282',
+                border: 'none',
+                borderRadius: '30px',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: '600',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                 cursor: 'pointer',
-                transition: 'all 0.18s',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '45px', height: '40px', borderRadius: '10px', background: '#EDF2F7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
-                  {getPlaceIcon(place.type)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#1A365D', marginBottom: '4px' }}>
-                    {place.name}
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#666', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span>{place.type}</span>
-                    {place.rating && <span>⭐ {place.rating}</span>}
-                    <span>{place.distance}m</span>
-                  </div>
-                </div>
-              </div>
-
+              🗺️ {showSearchPanel ? 'Hide Route' : 'Show Route'}
+            </button>
+            {nearbyPlaces.length > 0 && !isRerouted && (
               <button
-                onClick={() => handleRerouteToPlace(place)}
+                onClick={() => setShowPlacesPanel(!showPlacesPanel)}
                 style={{
-                  padding: '6px 10px',
-                  background: '#FF9800',
-                  color: 'white',
+                  backgroundColor: showPlacesPanel ? '#FF9800' : '#ffffff',
+                  color: showPlacesPanel ? 'white' : '#FF9800',
                   border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
+                  borderRadius: '30px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
                   fontWeight: '600',
-                  width: '100%'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  cursor: 'pointer',
                 }}
               >
-                Reroute Here
+                📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
               </button>
-            </div>
-          ))}
-
-          {isRerouted && reroutedPlace && (
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: '#FFF3E0',
-              borderRadius: '12px',
-              border: '1px solid #FF9800'
-            }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: '#E65100', marginBottom: '8px' }}>
-                Currently Rerouted
-              </div>
-              <div style={{ fontSize: '11px', color: '#BF360C', marginBottom: '8px' }}>
-                To: <strong>{reroutedPlace.name}</strong>
-              </div>
+            )}
+            {waypointsList.length > 0 && (
               <button
-                onClick={undoReroute}
+                onClick={() => setShowItineraryPanel(!showItineraryPanel)}
                 style={{
-                  padding: '6px 12px',
-                  background: '#FF9800',
-                  color: 'white',
+                  backgroundColor: showItineraryPanel ? '#7B1FA2' : '#ffffff',
+                  color: showItineraryPanel ? 'white' : '#7B1FA2',
                   border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
+                  borderRadius: '30px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
                   fontWeight: '600',
-                  width: '100%'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  cursor: 'pointer',
                 }}
               >
-                Undo
+                📋 {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}
               </button>
+            )}
+          </div>
+        )}
+
+        {/* Search Panel (collapsible) */}
+        {showSearchPanel && (
+          <div style={{ position: 'absolute', top: '130px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '50%', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A365D' }}>📍 Route Planner</div>
+              <button onClick={() => setShowSearchPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>✕</button>
             </div>
-          )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <SearchInput placeholder="From" value={originText} onChange={setOriginText} onSelect={handleOriginSelect} icon="🟦" isMobile={true} />
+                <button onClick={getUserLocation} style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>📍</button>
+              </div>
+              <SearchInput placeholder="To" value={destText} onChange={setDestText} onSelect={handleDestSelect} icon="🔴" isMobile={true} />
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {modeOptions.map(({ key, icon, label }) => (
+                  <button key={key} onClick={() => setRouteMode(key)} title={label}
+                    style={{ padding: '5px 8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.1)' : 'scale(1)' }}
+                  >{icon}</button>
+                ))}
+                <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting}
+                  style={{ marginLeft: 'auto', padding: '6px 16px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '12px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}
+                >{isRouting ? '...' : 'Go'}</button>
+                {isRerouted && <button onClick={undoReroute} style={{ padding: '6px 8px', borderRadius: '8px', border: 'none', background: '#FF9800', color: 'white', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>Undo</button>}
+                {(origin || destination || routeCoords) && <button onClick={clearAll} style={{ padding: '6px 8px', borderRadius: '8px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>}
+              </div>
+              {routeError && <div style={{ fontSize: '11px', color: '#E53E3E', padding: '5px 8px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
+              {routeInfo && (
+                <div style={{ display: 'flex', gap: '8px', padding: '5px 10px', background: '#EBF8FF', borderRadius: '8px', fontSize: '11px', fontWeight: '700', color: '#2C5282', justifyContent: 'space-between' }}>
+                  <span>📏 {routeInfo.distance} km</span>
+                  <span>⏱ {routeInfo.adjustedTime} min</span>
+                  {routeInfo.trafficDelay > 0 && <span>🚦 +{routeInfo.trafficDelay} min</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Places Panel (collapsible) */}
+        {!pickMode && !isRerouted && nearbyPlaces.length > 0 && showPlacesPanel && (
+          <div style={{ position: 'absolute', bottom: '80px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'white', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '40%', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A365D' }}>📍 Places Along Route ({getFilteredPlaces().length})</div>
+              <button onClick={() => setShowPlacesPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              {placeFilterOptions.slice(0, 4).map(option => (
+                <button key={option.key} onClick={() => setPlaceTypeFilter(option.key)} style={{ padding: '3px 8px', borderRadius: '15px', border: 'none', background: placeTypeFilter === option.key ? '#2C5282' : '#EDF2F7', color: placeTypeFilter === option.key ? 'white' : '#333', cursor: 'pointer', fontSize: '10px' }}>{option.icon} {option.label}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {getFilteredPlaces().slice(0, 5).map((place, i) => (
+                <div key={i} style={{ backgroundColor: '#f5f5f5', borderRadius: '10px', padding: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: '11px', fontWeight: '700', color: '#1A365D' }}>{getPlaceIcon(place.type)} {place.name}</div><div style={{ fontSize: '9px', color: '#666' }}>{place.distance}m • {place.rating ? `⭐ ${place.rating}` : ''}</div></div>
+                  <button onClick={() => handleRerouteToPlace(place)} style={{ padding: '4px 10px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: '600' }}>Reroute</button>
+                </div>
+              ))}
+              {getFilteredPlaces().length > 5 && <div style={{ fontSize: '10px', textAlign: 'center', color: '#666', padding: '4px' }}>+{getFilteredPlaces().length - 5} more places</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Itinerary Panel (collapsible) */}
+        {!pickMode && waypointsList.length > 0 && showItineraryPanel && (
+          <div style={{ position: 'absolute', bottom: '80px', right: '10px', left: '10px', zIndex: 1002, pointerEvents: 'auto', background: '#EDE7F6', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '40%', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A148C' }}>🗺️ Itinerary • Stop {currentWaypointIndex + 1}/{waypointsList.length}</div>
+              <button onClick={() => setShowItineraryPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', justifyContent: 'center' }}>
+              {waypointsList.map((_, i) => (
+                <div key={i} style={{ width: i === currentWaypointIndex ? '24px' : '6px', height: '6px', borderRadius: '3px', background: i < currentWaypointIndex ? '#7B1FA2' : i === currentWaypointIndex ? '#AB47BC' : '#D1C4E9', transition: 'all 0.3s ease' }}></div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+              {waypointsList.map((wp, i) => (
+                <div key={i} style={{ backgroundColor: i === currentWaypointIndex ? 'white' : i < currentWaypointIndex ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)', borderRadius: '8px', padding: '6px 8px', fontSize: '10px', fontWeight: i === currentWaypointIndex ? '700' : '400', color: '#1A365D' }}>
+                  {i + 1}. {wp.label || wp.activityName || `Stop ${i + 1}`}
+                </div>
+              ))}
+            </div>
+            {currentWaypointIndex < waypointsList.length - 1 && (
+              <button onClick={goToNextWaypoint} style={{ marginTop: '8px', padding: '8px', background: 'linear-gradient(135deg, #7B1FA2, #AB47BC)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: '700', width: '100%' }}>Next Stop →</button>
+            )}
+          </div>
+        )}
+      </>
+
+      {/* Loading indicator */}
+      {isLoadingPlaces && (
+        <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', zIndex: 1002 }}>
+          Finding places along your route...
         </div>
       )}
     </div>
