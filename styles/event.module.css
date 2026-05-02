@@ -15,7 +15,7 @@
 .mainContent {
   flex: 1;
   margin-left: 80px;
-  padding: 40px 60px;
+  padding: 40px 60px 100px;
   position: relative;
   z-index: 1;
   display: flex;
@@ -1404,13 +1404,21 @@
   display: none;
 }
 
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .mainContent {
+    margin-left: 0;
+    padding: 20px 20px 120px; /* Increased bottom padding for mobile nav */
+  }
+}
+
 /* ========================================
    MOBILE RESPONSIVE
    ======================================== */
 @media (max-width: 768px) {
   .mainContent {
     margin-left: 0;
-    padding: 16px 14px 150px 14px;
+    padding: 20px 20px 120px; /* Increased bottom padding for mobile nav */
   }
 
   /* Header */

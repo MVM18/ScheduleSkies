@@ -1,11 +1,17 @@
 import React, { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import styles from '@/styles/auth.module.css'
 import { FaEye, FaEyeSlash } from 'react-icons/fa'
 
 export default function SignupPage() {
+  const router = useRouter()
+  const returnTo = typeof router.query.returnTo === 'string' ? router.query.returnTo : ''
+  const loginHref = returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'
+  const importPending = returnTo.includes('/plan')
+
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,6 +66,13 @@ export default function SignupPage() {
 
           <h1 className={styles.heading}>Create account</h1>
           <p className={styles.subheading}>Sign up and start organizing your next trip.</p>
+
+          {importPending ? (
+            <p className={styles.message} style={{ background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
+              After you confirm your email and log in, open <strong>My Events</strong> to import the itinerary you generated on the
+              home page. It stays in this browser until you save it.
+            </p>
+          ) : null}
 
           <form onSubmit={handleSignup} className={styles.form}>
             <div className={styles.field}>
@@ -125,7 +138,7 @@ export default function SignupPage() {
           </form>
 
           <p className={styles.footerText}>
-            Already have an account? <Link href="/login" className={styles.link}>Log in</Link>
+            Already have an account? <Link href={loginHref} className={styles.link}>Log in</Link>
           </p>
         </section>
       </main>

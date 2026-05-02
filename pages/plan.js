@@ -7,6 +7,12 @@ import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
 import ShareModal from '@/components/ShareModal';
 import BudgetModal from '@/components/BudgetModal';
+import {
+  readPendingItinerary,
+  clearPendingItinerary,
+  buildItineraryEventDraft,
+  buildActivityDraftsFromStructured,
+} from '@/lib/itineraryImportShared';
 
 const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
@@ -90,6 +96,12 @@ const MyEvents = () => {
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const [selectedEventForBudget, setSelectedEventForBudget] = useState(null);
 
+  const [pendingImport, setPendingImport] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [importItineraryActive, setImportItineraryActive] = useState(false);
+  const [importActivityActive, setImportActivityActive] = useState(false);
+  const [importActivityIndex, setImportActivityIndex] = useState(0);
+
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
 
@@ -142,7 +154,7 @@ const MyEvents = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.push('/login');
+        router.push('/');
       } else {
         setUserId(session.user.id);
         fetchEvents();
@@ -169,6 +181,29 @@ const MyEvents = () => {
     };
     fetchWeather();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const stored = readPendingItinerary();
+    if (!stored?.structured) {
+      setPendingImport(null);
+      return;
+    }
+    const activityDrafts = buildActivityDraftsFromStructured(stored.structured);
+    const eventDraft = buildItineraryEventDraft(stored.structured, stored.prompt);
+    if (!eventDraft || activityDrafts.length === 0) {
+      clearPendingItinerary();
+      setPendingImport(null);
+      return;
+    }
+    setPendingImport({
+      prompt: stored.prompt,
+      source: stored.source,
+      structured: stored.structured,
+      eventDraft,
+      activityDrafts,
+    });
+  }, [userId]);
 
   // --- AI ANALYSIS ---
   const handleAiAnalysis = async () => {
@@ -232,8 +267,18 @@ const MyEvents = () => {
     if (aiSuggestions.length <= 1) setShowAiPanel(false);
   };
 
+  const handleDismissPendingImport = () => {
+    clearPendingItinerary();
+    setPendingImport(null);
+    setImportError('');
+    setImportItineraryActive(false);
+    setImportActivityActive(false);
+    setImportActivityIndex(0);
+  };
+
   // --- 4. FORM & EVENT LOGIC ---
   const handleOpenAddForm = () => {
+    setImportItineraryActive(false);
     setFormData(initialFormState);
     setEditingId(null);
     setFormError('');
@@ -256,6 +301,7 @@ const MyEvents = () => {
   };
 
   const handleOpenEditForm = (event) => {
+    setImportItineraryActive(false);
     setFormData({
       title: event.title,
       location: event.location,
@@ -272,6 +318,47 @@ const MyEvents = () => {
     setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
+  };
+
+  const applyDraftToForm = (draft) => {
+    const locationText = draft.location || '';
+    const derivedVenue = draft.venue || locationText.split(',')[0]?.trim() || '';
+
+    setFormData({
+      title: draft.title || '',
+      location: locationText,
+      price: draft.price != null ? String(draft.price) : '',
+      date: draft.date || '',
+      category: draft.category || 'Food',
+      venue: derivedVenue,
+      start_datetime: draft.start_datetime ? isoToLocalInput(draft.start_datetime) : '',
+      end_datetime: draft.end_datetime ? isoToLocalInput(draft.end_datetime) : '',
+      latitude: draft.latitude ?? null,
+      longitude: draft.longitude ?? null,
+    });
+  };
+
+  const handleStartImportItinerary = () => {
+    if (!pendingImport?.eventDraft) return;
+    setImportError('');
+    setImportItineraryActive(true);
+    setEditingId(null);
+    applyDraftToForm(pendingImport.eventDraft);
+    setLocationResults([]);
+    setFormError('');
+    setIsFormOpen(true);
+  };
+
+  const handleContinueImportActivities = () => {
+    if (!pendingImport?.activityDrafts?.length || !selectedEventForItinerary) return;
+    setImportError('');
+    setImportActivityActive(true);
+    setIsActivityFormOpen(true);
+  };
+
+  const closeEventForm = () => {
+    setIsFormOpen(false);
+    if (importItineraryActive) setImportItineraryActive(false);
   };
 
   const handleDeleteEvent = async (id) => {
@@ -332,8 +419,29 @@ const MyEvents = () => {
     } else {
       const { data, error } = await supabase.from('events').insert([newEventData]).select();
       if (data && !error) {
-        setEventData(prev => [...prev, generateDynamicProps(data[0])]);
+        const created = generateDynamicProps(data[0]);
+        setEventData(prev => [...prev, created]);
         setActiveFilter('All Events');
+
+        if (importItineraryActive && pendingImport?.activityDrafts?.length) {
+          // Open itinerary modal for the newly created event, then start importing activities
+          await handleOpenItinerary(created);
+          setImportActivityActive(true);
+          setImportActivityIndex(0);
+          setEditingActivityId(null);
+          const first = pendingImport.activityDrafts[0];
+          setActivityForm({
+            activity_name: first.activity_name || '',
+            description: first.description || '',
+            start_time: isoToLocalInput(first.start_time),
+            end_time: isoToLocalInput(first.end_time),
+            location: first.location || '',
+            latitude: first.latitude ?? null,
+            longitude: first.longitude ?? null,
+          });
+          setIsActivityFormOpen(true);
+          setImportItineraryActive(false);
+        }
       }
     }
 
@@ -599,7 +707,7 @@ const MyEvents = () => {
       location: activityForm.location || null,
       latitude: activityForm.latitude,
       longitude: activityForm.longitude,
-      sort_order: activities.length
+      sort_order: importActivityActive ? importActivityIndex : activities.length
     };
 
     if (editingActivityId) {
@@ -618,6 +726,30 @@ const MyEvents = () => {
         .select();
       if (data && !error) {
         setActivities(prev => [...prev, data[0]]);
+        if (importActivityActive && pendingImport?.activityDrafts?.length) {
+          const nextIdx = importActivityIndex + 1;
+          if (nextIdx < pendingImport.activityDrafts.length) {
+            const next = pendingImport.activityDrafts[nextIdx];
+            setImportActivityIndex(nextIdx);
+            setEditingActivityId(null);
+            setActivityForm({
+              activity_name: next.activity_name || '',
+              description: next.description || '',
+              start_time: isoToLocalInput(next.start_time),
+              end_time: isoToLocalInput(next.end_time),
+              location: next.location || '',
+              latitude: next.latitude ?? null,
+              longitude: next.longitude ?? null,
+            });
+            setIsActivityFormOpen(true);
+            return;
+          }
+          // Finished importing all activities
+          clearPendingItinerary();
+          setPendingImport(null);
+          setImportActivityActive(false);
+          setImportActivityIndex(0);
+        }
       }
     }
 
@@ -853,6 +985,88 @@ const MyEvents = () => {
           </div>
         </header>
 
+        {pendingImport ? (
+          <section
+            style={{
+              marginBottom: '14px',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              border: '1px solid rgba(37, 99, 235, 0.25)',
+              background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.98))',
+              boxShadow: '0 8px 24px rgba(37, 99, 235, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 6px', fontSize: '15px', color: '#1e3a8a', fontWeight: 700 }}>
+                  Itinerary from home demo
+                </h2>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#475569', lineHeight: 1.55, maxWidth: '62ch' }}>
+                  {pendingImport.prompt ? (
+                    <>
+                      <strong>Prompt:</strong> {pendingImport.prompt}
+                      <br />
+                    </>
+                  ) : null}
+                  {pendingImport.structured?.summary ? (
+                    <>
+                      <strong>Summary:</strong> {pendingImport.structured.summary}
+                      <br />
+                    </>
+                  ) : null}
+                  Create <strong>one event</strong> for this itinerary, then add <strong>{pendingImport.activityDrafts.length}</strong> places
+                  as activities inside that event.
+                </p>
+                {importError ? (
+                  <p style={{ margin: '8px 0 0', fontSize: '12.5px', color: '#b91c1c', fontWeight: 600 }}>{importError}</p>
+                ) : null}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleStartImportItinerary}
+                  style={{
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    background: '#2563eb',
+                    color: '#fff',
+                  }}
+                >
+                  Create itinerary event
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissPendingImport}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    background: '#fff',
+                    color: '#334155',
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            <ul style={{ margin: '12px 0 0', paddingLeft: '18px', fontSize: '12px', color: '#334155', lineHeight: 1.5 }}>
+              {pendingImport.activityDrafts.slice(0, 6).map((a, i) => (
+                <li key={`${a.activity_name}-${i}`}>
+                  {new Date(a.start_time).toLocaleString()} — {a.activity_name} @ {a.location}
+                </li>
+              ))}
+              {pendingImport.activityDrafts.length > 6 ? <li>…and {pendingImport.activityDrafts.length - 6} more</li> : null}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Status Filter Tabs */}
         <div className={styles.statusFilterBar}>
           {['All', 'Upcoming', 'Done'].map(status => (
@@ -1073,11 +1287,17 @@ const MyEvents = () => {
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
       {isFormOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsFormOpen(false)}>
+        <div className={styles.modalOverlay} onClick={closeEventForm}>
           <div className={styles.formModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.formHeader}>
-              <h2>{editingId ? 'Edit Event' : 'Create New Event'}</h2>
-              <button className={styles.closeBtnLight} onClick={() => setIsFormOpen(false)}>✕</button>
+              <h2>
+                {editingId
+                  ? 'Edit Event'
+                  : importItineraryActive && pendingImport?.activityDrafts?.length
+                    ? `Create itinerary event (then ${pendingImport.activityDrafts.length} activities)`
+                    : 'Create New Event'}
+              </h2>
+              <button type="button" className={styles.closeBtnLight} onClick={closeEventForm}>✕</button>
             </div>
 
             <form onSubmit={handleSaveEvent} className={styles.eventForm}>
@@ -1177,8 +1397,14 @@ const MyEvents = () => {
               )}
 
               <div className={styles.formFooter}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsFormOpen(false)}>Cancel</button>
-                <button type="submit" className={styles.btnSave}>{editingId ? 'Save Changes' : 'Create Event'}</button>
+                <button type="button" className={styles.btnCancel} onClick={closeEventForm}>Cancel</button>
+                <button type="submit" className={styles.btnSave}>
+                  {editingId
+                    ? 'Save Changes'
+                    : importItineraryActive && pendingImport?.activityDrafts?.length
+                      ? 'Create itinerary & start activities'
+                      : 'Create Event'}
+                </button>
               </div>
             </form>
           </div>

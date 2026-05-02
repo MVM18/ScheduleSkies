@@ -19,7 +19,7 @@ export default function TopMenu() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push('/');
   };
 
   if (!user || router.pathname === '/profile') return null; // Only show on protected pages when logged in, and hide on profile since it has its own settings

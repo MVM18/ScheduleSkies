@@ -164,7 +164,7 @@ const ProfilePage = () => {
         const authUser = authData?.user;
 
         if (userError || !authUser) {
-          router.push('/login');
+          router.push('/');
           return;
         }
 
@@ -324,7 +324,7 @@ const ProfilePage = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push('/');
   };
 
   const handleDeleteAccount = async () => {

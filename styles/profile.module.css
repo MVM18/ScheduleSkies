@@ -140,7 +140,7 @@
 }
 
 .profile_body {
-  padding: 0;
+  padding: 0 1rem 9rem;
 }
 
 .card {
@@ -999,6 +999,7 @@
 .primaryBtn {
   flex: 1;
   min-width: 180px;
+  max-height: 3.5rem;
   padding: 1rem;
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
@@ -1041,6 +1042,7 @@
   justify-content: center;
   gap: 0.5rem;
   transition: all 0.3s ease;
+  margin-bottom: 85px;
 }
 
 .logoutBtn:hover {
