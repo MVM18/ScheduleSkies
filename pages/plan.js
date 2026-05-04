@@ -7,6 +7,13 @@ import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
 import ShareModal from '@/components/ShareModal';
 import BudgetModal from '@/components/BudgetModal';
+import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import TimeKeeper from 'react-timekeeper';
+import { 
+  addMonths, subMonths, format, startOfMonth, endOfMonth, 
+  startOfWeek, endOfWeek, isSameMonth, addDays, isToday 
+} from 'date-fns';
 import {
   readPendingItinerary,
   clearPendingItinerary,
@@ -57,12 +64,19 @@ const MyEvents = () => {
   // Modal & Form States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarDirection, setCalendarDirection] = useState(0); 
   const [isEditListMode, setIsEditListMode] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [locationResults, setLocationResults] = useState([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Clock UI States
+  const [showEventStartClock, setShowEventStartClock] = useState(false);
+  const [showEventEndClock, setShowEventEndClock] = useState(false);
+  const [showActStartClock, setShowActStartClock] = useState(false);
+  const [showActEndClock, setShowActEndClock] = useState(false);
 
   // Itinerary States
   const [isItineraryOpen, setIsItineraryOpen] = useState(false);
@@ -77,7 +91,7 @@ const MyEvents = () => {
   const [activityLocationResults, setActivityLocationResults] = useState([]);
   const [isSearchingActivityLocation, setIsSearchingActivityLocation] = useState(false);
 
-  // Progress bar — completed activities tracked in localStorage
+  // Progress bar
   const [completedActivities, setCompletedActivities] = useState({});
 
   const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null };
@@ -88,11 +102,9 @@ const MyEvents = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  // Share / Collaboration State
+  // Share / Budget State
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedEventForShare, setSelectedEventForShare] = useState(null);
-
-  // Budget State
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const [selectedEventForBudget, setSelectedEventForBudget] = useState(null);
 
@@ -105,7 +117,20 @@ const MyEvents = () => {
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
 
-  // --- STATUS HELPERS ---
+  // --- HELPERS ---
+  const getTimePart = (dt) => dt && dt.includes('T') ? dt.split('T')[1].substring(0, 5) : '12:00';
+  const getDatePart = (dt) => dt && dt.includes('T') ? dt.split('T')[0] : new Date().toISOString().split('T')[0];
+
+  // Helper to display 24h string (14:30) as 12h string (2:30 PM)
+  const formatDisplayTime = (time24) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':');
+    const hours = parseInt(h, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${m} ${ampm}`;
+  };
+
   const getEventStatus = (event) => {
     const now = new Date();
     const endDate = event.end_datetime ? new Date(event.end_datetime) : (event.date ? new Date(event.date + 'T23:59:59') : null);
@@ -121,7 +146,6 @@ const MyEvents = () => {
     Done: eventData.filter(e => getEventStatus(e) === 'done').length,
   };
 
-  // --- PROGRESS BAR HELPERS ---
   const loadCompletedActivities = (eventId) => {
     try {
       const stored = localStorage.getItem(`itinerary_progress_${eventId}`);
@@ -279,19 +303,18 @@ const MyEvents = () => {
   // --- 4. FORM & EVENT LOGIC ---
   const handleOpenAddForm = () => {
     setImportItineraryActive(false);
-    setFormData(initialFormState);
+    // Initialize date to current date to act as fallback if start/end aren't filled
+    setFormData({ ...initialFormState, date: new Date().toISOString().split('T')[0] });
     setEditingId(null);
     setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
   };
 
-  // Convert a TIMESTAMPTZ ISO string from Supabase to local datetime-local value
   const isoToLocalInput = (isoStr) => {
     if (!isoStr) return '';
     const d = new Date(isoStr);
     if (isNaN(d.getTime())) return '';
-    // Format as YYYY-MM-DDTHH:MM in local time
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -306,7 +329,7 @@ const MyEvents = () => {
       title: event.title,
       location: event.location,
       price: event.price,
-      date: event.date,
+      date: event.date || new Date().toISOString().split('T')[0],
       category: event.category || 'Food',
       venue: event.venue || '',
       start_datetime: isoToLocalInput(event.start_datetime),
@@ -328,7 +351,7 @@ const MyEvents = () => {
       title: draft.title || '',
       location: locationText,
       price: draft.price != null ? String(draft.price) : '',
-      date: draft.date || '',
+      date: draft.date || new Date().toISOString().split('T')[0],
       category: draft.category || 'Food',
       venue: derivedVenue,
       start_datetime: draft.start_datetime ? isoToLocalInput(draft.start_datetime) : '',
@@ -349,13 +372,6 @@ const MyEvents = () => {
     setIsFormOpen(true);
   };
 
-  const handleContinueImportActivities = () => {
-    if (!pendingImport?.activityDrafts?.length || !selectedEventForItinerary) return;
-    setImportError('');
-    setImportActivityActive(true);
-    setIsActivityFormOpen(true);
-  };
-
   const closeEventForm = () => {
     setIsFormOpen(false);
     if (importItineraryActive) setImportItineraryActive(false);
@@ -373,7 +389,6 @@ const MyEvents = () => {
     if (!userId) return;
     setFormError('');
 
-    // --- Validation: minimum 5 hours in advance ---
     if (formData.start_datetime) {
       const startTime = new Date(formData.start_datetime);
       const now = new Date();
@@ -401,7 +416,8 @@ const MyEvents = () => {
       title: formData.title,
       location: formData.location,
       price: formData.price,
-      date: formData.date || (formData.start_datetime ? formData.start_datetime.split('T')[0] : null),
+      // Date acts as a creation/fallback date, invisible to the user in the UI.
+      date: formData.date || (formData.start_datetime ? formData.start_datetime.split('T')[0] : new Date().toISOString().split('T')[0]),
       category: formData.category,
       user_id: userId,
       venue: formData.venue || null,
@@ -424,7 +440,6 @@ const MyEvents = () => {
         setActiveFilter('All Events');
 
         if (importItineraryActive && pendingImport?.activityDrafts?.length) {
-          // Open itinerary modal for the newly created event, then start importing activities
           await handleOpenItinerary(created);
           setImportActivityActive(true);
           setImportActivityIndex(0);
@@ -681,7 +696,6 @@ const MyEvents = () => {
     e.preventDefault();
     if (!userId || !selectedEventForItinerary) return;
 
-    // Validation: Check if activity times are within event times
     const eventStart = new Date(selectedEventForItinerary.start_datetime);
     const eventEnd = new Date(selectedEventForItinerary.end_datetime);
     const activityStart = new Date(activityForm.start_time);
@@ -744,7 +758,6 @@ const MyEvents = () => {
             setIsActivityFormOpen(true);
             return;
           }
-          // Finished importing all activities
           clearPendingItinerary();
           setPendingImport(null);
           setImportActivityActive(false);
@@ -774,11 +787,9 @@ const MyEvents = () => {
     }
   };
 
-  // Multi-waypoint: event venue first, then activity locations
   const handleNavigateItinerary = (event, activitiesList) => {
     const waypoints = [];
 
-    // First waypoint: the event venue itself
     if (event.latitude && event.longitude) {
       waypoints.push({
         lat: parseFloat(event.latitude),
@@ -787,7 +798,6 @@ const MyEvents = () => {
       });
     }
 
-    // Subsequent waypoints: activity locations
     activitiesList.forEach(a => {
       if (a.location && a.location.trim()) {
         if (a.latitude && a.longitude) {
@@ -820,21 +830,36 @@ const MyEvents = () => {
     return matchesCategory && matchesSearch && matchesStatus;
   });
 
-  // --- 7. CALENDAR GENERATION ---
-  const currentYear = calendarDate.getFullYear();
-  const currentMonth = calendarDate.getMonth();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-  const blanks = Array(firstDayOfMonth).fill(null);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  // --- 7. NEW CALENDAR LOGIC (date-fns & framer-motion) ---
+  const handlePrevMonth = () => {
+    setCalendarDirection(-1);
+    setCalendarDate(prev => subMonths(prev, 1));
+  };
 
-  const handlePrevMonth = () => setCalendarDate(new Date(currentYear, currentMonth - 1, 1));
-  const handleNextMonth = () => setCalendarDate(new Date(currentYear, currentMonth + 1, 1));
-  const handleToday = () => setCalendarDate(new Date());
+  const handleNextMonth = () => {
+    setCalendarDirection(1);
+    setCalendarDate(prev => addMonths(prev, 1));
+  };
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const handleToday = () => {
+    setCalendarDirection(0);
+    setCalendarDate(new Date());
+  };
 
-  // --- HELPERS ---
+  const handleMonthDragEnd = (event, info) => {
+    if (info.offset.x < -50) {
+      handleNextMonth();
+    } else if (info.offset.x > 50) {
+      handlePrevMonth();
+    }
+  };
+
+  const calVariants = {
+    enter: (direction) => ({ x: direction > 0 ? 100 : -100, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (direction) => ({ x: direction < 0 ? 100 : -100, opacity: 0 }),
+  };
+
   const formatDateTime = (dtStr) => {
     if (!dtStr) return '';
     const d = new Date(dtStr);
@@ -884,14 +909,8 @@ const MyEvents = () => {
     }
   };
 
-  const handleDragStart = (eventId) => {
-    setDraggedEventId(eventId);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedEventId(null);
-    setDragOverDate(null);
-  };
+  const handleDragStart = (eventId) => setDraggedEventId(eventId);
+  const handleDragEnd = () => { setDraggedEventId(null); setDragOverDate(null); };
 
   const handleDropOnDate = async (dateStr) => {
     if (!draggedEventId) return;
@@ -946,8 +965,98 @@ const MyEvents = () => {
   };
 
   const calendarConflictEventIds = getCalendarConflictEventIds();
-
   const progressPercent = getProgressPercent();
+
+  const renderCalendarCells = () => {
+    const monthStart = startOfMonth(calendarDate);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const cellDays = [];
+    let day = startDate;
+
+    while (day <= endDate) {
+      const cloneDay = day;
+      const dateStr = format(cloneDay, 'yyyy-MM-dd');
+      const dayEvents = eventData.filter(e => getEventCalendarDate(e) === dateStr);
+      const hasEvent = dayEvents.length > 0;
+      const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
+      const isCurrentMonth = isSameMonth(cloneDay, monthStart);
+      const isCurrentDay = isToday(cloneDay); 
+
+      cellDays.push(
+        <div
+          key={cloneDay.toString()}
+          className={styles.calCell}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
+          onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
+          onDragLeave={() => setDragOverDate(null)}
+          style={{
+            opacity: isCurrentMonth ? 1 : 0.4,
+            backgroundColor: dragOverDate === dateStr 
+              ? 'rgba(118, 181, 217, 0.2)' 
+              : hasConflict 
+                ? 'rgba(248, 113, 113, 0.12)' 
+                : hasEvent 
+                  ? 'rgba(94, 224, 147, 0.1)' 
+                  : '#1a1a1a',
+            border: dragOverDate === dateStr 
+              ? '2px dashed #76b5d9' 
+              : hasConflict 
+                ? '1px solid #EF4444' 
+                : hasEvent 
+                  ? '1px solid #5EE093' 
+                  : 'none'
+          }}
+        >
+          <span 
+            className={styles.calDayNum} 
+            style={isCurrentDay ? {
+              backgroundColor: '#10B981', 
+              color: 'white',
+              borderRadius: '50%',
+              width: '24px',
+              height: '24px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              margin: '0 auto 6px auto'
+            } : hasEvent ? { fontWeight: 'bold', color: '#76b5d9' } : {}}
+          >
+            {format(cloneDay, 'd')}
+          </span>
+          <div className={styles.calEventsContainer}>
+            {dayEvents.map(ev => {
+              const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
+              const isConflict = calendarConflictEventIds.has(ev.id);
+              return (
+                <div
+                  key={ev.id}
+                  className={styles.calEventPill}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
+                    color: isConflict ? '#fff' : '#111',
+                    border: isConflict ? '1px solid #DC2626' : undefined,
+                    cursor: 'grab'
+                  }}
+                  title={`Drag to move event to another day`}
+                >
+                  {eventTime} · {ev.title}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      day = addDays(day, 1);
+    }
+    return cellDays;
+  };
 
   return (
     <div className={styles.appContainer}>
@@ -1353,22 +1462,102 @@ const MyEvents = () => {
                 </div>
               </div>
 
+              {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI */}
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>Start Date & Time</label>
-                  <input type="datetime-local" value={formData.start_datetime} onChange={e => setFormData({ ...formData, start_datetime: e.target.value, date: e.target.value ? e.target.value.split('T')[0] : formData.date })} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input 
+                      type="date" 
+                      style={{ flex: 1.5 }}
+                      value={getDatePart(formData.start_datetime)} 
+                      onChange={e => {
+                        const timePart = getTimePart(formData.start_datetime);
+                        const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
+                        setFormData({ ...formData, start_datetime: newVal, date: e.target.value || formData.date });
+                      }} 
+                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input 
+                        type="text" 
+                        readOnly
+                        style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                        value={formatDisplayTime(getTimePart(formData.start_datetime))} 
+                        onClick={() => setShowEventStartClock(true)}
+                        placeholder="Time"
+                      />
+                      <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                      
+                      {/* React Timekeeper Popup */}
+                      {showEventStartClock && (
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventStartClock(false)} />
+                          <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                            <TimeKeeper 
+                              time={getTimePart(formData.start_datetime)}
+                              onChange={(data) => {
+                                const datePart = getDatePart(formData.start_datetime);
+                                setFormData({ ...formData, start_datetime: `${datePart}T${data.formatted24}` });
+                              }}
+                              onDoneClick={() => setShowEventStartClock(false)}
+                              switchToMinuteOnHourSelect
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </div>
+              
+              <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>End Date & Time</label>
-                  <input type="datetime-local" value={formData.end_datetime} onChange={e => setFormData({ ...formData, end_datetime: e.target.value })} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input 
+                      type="date" 
+                      style={{ flex: 1.5 }}
+                      value={getDatePart(formData.end_datetime)} 
+                      onChange={e => {
+                        const timePart = getTimePart(formData.end_datetime);
+                        const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
+                        setFormData({ ...formData, end_datetime: newVal });
+                      }} 
+                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input 
+                        type="text" 
+                        readOnly
+                        style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                        value={formatDisplayTime(getTimePart(formData.end_datetime))} 
+                        onClick={() => setShowEventEndClock(true)}
+                        placeholder="Time"
+                      />
+                      <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                      
+                      {/* React Timekeeper Popup */}
+                      {showEventEndClock && (
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventEndClock(false)} />
+                          <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                            <TimeKeeper 
+                              time={getTimePart(formData.end_datetime)}
+                              onChange={(data) => {
+                                const datePart = getDatePart(formData.end_datetime) || getDatePart(formData.start_datetime);
+                                setFormData({ ...formData, end_datetime: `${datePart}T${data.formatted24}` });
+                              }}
+                              onDoneClick={() => setShowEventEndClock(false)}
+                              switchToMinuteOnHourSelect
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label>Date (fallback)</label>
-                  <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
-                </div>
                 <div className={styles.formGroup}>
                   <label>Category</label>
                   <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
@@ -1571,14 +1760,104 @@ const MyEvents = () => {
                         <label>Activity Name *</label>
                         <input required type="text" value={activityForm.activity_name} onChange={e => setActivityForm({ ...activityForm, activity_name: e.target.value })} placeholder="e.g. Opening Speech" />
                       </div>
+                      
+                      {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI ON ACTIVITIES */}
                       <div>
-                        <label>Start Time *</label>
-                        <input required type="datetime-local" value={activityForm.start_time} onChange={e => setActivityForm({ ...activityForm, start_time: e.target.value })} min={isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
+                        <label>Start *</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            required 
+                            type="date" 
+                            style={{ flex: 1.5 }}
+                            value={getDatePart(activityForm.start_time)} 
+                            onChange={e => {
+                              const timePart = getTimePart(activityForm.start_time);
+                              setActivityForm({ ...activityForm, start_time: `${e.target.value}T${timePart}` });
+                            }} 
+                            min={selectedEventForItinerary?.start_datetime?.split('T')[0]} 
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                          />
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <input 
+                              required 
+                              type="text" 
+                              readOnly
+                              style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                              value={formatDisplayTime(getTimePart(activityForm.start_time))} 
+                              onClick={() => setShowActStartClock(true)}
+                              placeholder="Time"
+                            />
+                            <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            
+                            {/* React Timekeeper Popup */}
+                            {showActStartClock && (
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActStartClock(false)} />
+                                <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                  <TimeKeeper 
+                                    time={getTimePart(activityForm.start_time)}
+                                    onChange={(data) => {
+                                      const datePart = getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]);
+                                      setActivityForm({ ...activityForm, start_time: `${datePart}T${data.formatted24}` });
+                                    }}
+                                    onDoneClick={() => setShowActStartClock(false)}
+                                    switchToMinuteOnHourSelect
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+
                       <div>
-                        <label>End Time *</label>
-                        <input required type="datetime-local" value={activityForm.end_time} onChange={e => setActivityForm({ ...activityForm, end_time: e.target.value })} min={activityForm.start_time || isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
+                        <label>End *</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            required 
+                            type="date" 
+                            style={{ flex: 1.5 }}
+                            value={getDatePart(activityForm.end_time)} 
+                            onChange={e => {
+                              const timePart = getTimePart(activityForm.end_time);
+                              setActivityForm({ ...activityForm, end_time: `${e.target.value}T${timePart}` });
+                            }} 
+                            min={getDatePart(activityForm.start_time) || selectedEventForItinerary?.start_datetime?.split('T')[0]} 
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                          />
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <input 
+                              required 
+                              type="text" 
+                              readOnly
+                              style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                              value={formatDisplayTime(getTimePart(activityForm.end_time))} 
+                              onClick={() => setShowActEndClock(true)}
+                              placeholder="Time"
+                            />
+                            <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            
+                            {/* React Timekeeper Popup */}
+                            {showActEndClock && (
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActEndClock(false)} />
+                                <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                  <TimeKeeper 
+                                    time={getTimePart(activityForm.end_time)}
+                                    onChange={(data) => {
+                                      const datePart = getDatePart(activityForm.end_time) || (getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]));
+                                      setActivityForm({ ...activityForm, end_time: `${datePart}T${data.formatted24}` });
+                                    }}
+                                    onDoneClick={() => setShowActEndClock(false)}
+                                    switchToMinuteOnHourSelect
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+
                       <div className={styles.fullWidth}>
                         <label>Description</label>
                         <textarea value={activityForm.description} onChange={e => setActivityForm({ ...activityForm, description: e.target.value })} placeholder="Brief description of the activity..." />
@@ -1674,76 +1953,60 @@ const MyEvents = () => {
       {isCalendarOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsCalendarOpen(false)}>
           <div className={styles.calendarModal} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header */}
             <div className={styles.calHeader}>
               <div className={styles.calHeaderLeft}>
                 <button className={styles.calTodayBtn} onClick={handleToday}>Today</button>
-                <div className={styles.calArrows}>
-                  <span onClick={handlePrevMonth} style={{ cursor: 'pointer', userSelect: 'none' }}>&lt;</span>
-                  <span onClick={handleNextMonth} style={{ cursor: 'pointer', userSelect: 'none' }}>&gt;</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    onClick={handlePrevMonth} 
+                    onDragEnter={(e) => { e.preventDefault(); handlePrevMonth(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    <ChevronLeft size={16} /> Prev
+                  </button>
+                  <button 
+                    onClick={handleNextMonth} 
+                    onDragEnter={(e) => { e.preventDefault(); handleNextMonth(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    Next <ChevronRight size={16} />
+                  </button>
                 </div>
-                <h2>{monthNames[currentMonth]} {currentYear}</h2>
+                <h2>{format(calendarDate, "MMMM yyyy")}</h2>
               </div>
               <div className={styles.calHeaderRight}>
                 <button className={styles.calCloseBtn} onClick={() => setIsCalendarOpen(false)}>✕</button>
               </div>
             </div>
+
+            {/* Weekdays */}
             <div className={styles.calWeekdays}>
               {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => <div key={day}>{day}</div>)}
             </div>
-            <div className={styles.calGrid}>
-              {blanks.map((_, i) => <div key={`blank-${i}`} className={styles.calCellEmpty}></div>)}
-              {days.map(day => {
-                const monthStr = String(currentMonth + 1).padStart(2, '0');
-                const dayStr = String(day).padStart(2, '0');
-                const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
-                const dayEvents = eventData.filter(e => e.date === dateStr);
-                const hasEvent = dayEvents.length > 0;
-                const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
-                return (
-                  <div
-                    key={day}
-                    className={styles.calCell}
-                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
-                    onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
-                    onDragLeave={() => setDragOverDate(null)}
-                    style={
-                      dragOverDate === dateStr
-                        ? { backgroundColor: 'rgba(118, 181, 217, 0.2)', border: '2px dashed #76b5d9' }
-                        : hasConflict
-                          ? { backgroundColor: 'rgba(248, 113, 113, 0.12)', border: '1px solid #EF4444' }
-                          : hasEvent
-                            ? { backgroundColor: 'rgba(94, 224, 147, 0.1)', border: '1px solid #5EE093' }
-                            : {}
-                    }
-                  >
-                    <span className={styles.calDayNum} style={hasEvent ? { fontWeight: 'bold', color: '#2C3E50' } : {}}>{day}</span>
-                    <div className={styles.calEventsContainer}>
-                      {dayEvents.map(ev => {
-                        const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
-                        const isConflict = calendarConflictEventIds.has(ev.id);
-                        return (
-                          <div
-                            key={ev.id}
-                            className={styles.calEventPill}
-                            draggable
-                            onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
-                            onDragEnd={handleDragEnd}
-                            style={{
-                              backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
-                              color: isConflict ? '#fff' : '#111',
-                              border: isConflict ? '1px solid #DC2626' : undefined,
-                              cursor: 'grab'
-                            }}
-                            title={`Drag to move event to another day`}
-                          >
-                            {eventTime} · {ev.title}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+
+            {/* Calendar Grid with Framer Motion Drag/Swipe */}
+            <div style={{ overflow: 'hidden', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <AnimatePresence initial={false} custom={calendarDirection} mode="popLayout">
+                <motion.div
+                  key={calendarDate.toString()}
+                  custom={calendarDirection}
+                  variants={calVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={1} 
+                  onDragEnd={handleMonthDragEnd}
+                  className={styles.calGrid}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', touchAction: 'pan-y' }}
+                >
+                  {renderCalendarCells()}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
         </div>
