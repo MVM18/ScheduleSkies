@@ -1186,90 +1186,31 @@ const MyEvents = () => {
             filteredEvents.map(event => {
               const status = getEventStatus(event);
               return (
-                <div key={event.id} className={styles.eventCard} style={{ position: 'relative' }}>
-                  <div className={styles.cardLeftBorder} style={{ backgroundColor: event.typeColor }}></div>
+                <div key={event.id} className={styles.eventCard} style={{
+                  position: 'relative',
+                  backgroundImage: `url(${event.image_link})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                }} 
+                onClick={() => handleOpenItinerary(event)}>
+                  <span>
+                    <div className={styles.titleContainer}>
+                      <p>{event.title}</p>
+                    </div>
+                  </span>
 
                   {/* Status Badge */}
                   <span
                     className={styles.cardStatusBadge}
                     style={{
                       background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                      color: status === 'done' ? '#15A862' : '#4396D1'
+                      color: status === 'done' ? '#15A862' : '#4396D1',
+                      border: '0.5px solid black'
                     }}
                   >
-                    {status === 'done' ? '✅ Done' : '🔜 Upcoming'}
+                    {status === 'done' ? 'Done' : 'Upcoming'}
                   </span>
-
-                  <div className={styles.cardBody}>
-                    <div className={styles.eventInfo}>
-                      <div className={styles.avatar}>
-                        {event.title.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className={styles.details}>
-                        <h3>{event.title}</h3>
-                        <p>{event.location} • {event.price}</p>
-
-                        {/* Enhanced meta info */}
-                        <div className={styles.eventMeta}>
-                          {event.venue && <span>🏛️ {event.venue}</span>}
-                          {event.start_datetime ? (
-                            <span>📅 {formatDateTime(event.start_datetime)}</span>
-                          ) : event.date ? (
-                            <span>📅 {event.date}</span>
-                          ) : null}
-                          {event.end_datetime && <span>→ {formatTime(event.end_datetime)}</span>}
-                        </div>
-
-                        <div className={styles.tagRow}>
-                          {event.tags.map((tag, index) => (
-                            <span key={index} className={`${styles.tag} ${tag.styleClass}`}>
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-
-                        {event.aiSuggestion && (
-                          <div className={styles.tagRow}>
-                            <div className={styles.aiBox}>{event.aiSuggestion}</div>
-                          </div>
-                        )}
-
-                        {/* Itinerary, Share, Budget & Navigate Buttons */}
-                        <div className={styles.cardBtnRow}>
-                          <button
-                            className={styles.itineraryBtn}
-                            onClick={() => handleOpenItinerary(event)}
-                          >
-                            📋 Itinerary
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #4A90D9, #6D7DB9)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForShare(event); setIsShareModalOpen(true); }}
-                          >
-                            🔗 Share
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForBudget(event); setIsBudgetOpen(true); }}
-                          >
-                            💰 Budget
-                          </button>
-                          {(event.latitude && event.longitude) ? (
-                            <button
-                              className={styles.navigateBtn}
-                              onClick={() => handleNavigateToVenue(event)}
-                            >
-                              🧭 Navigate
-                            </button>
-                          ) : (
-                            <span className={styles.locationHint}>📍 Select location from search to enable navigation</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Conditionally Render Edit/Delete Actions */}
                   {isEditListMode && (

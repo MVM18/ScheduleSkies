@@ -144,21 +144,39 @@
 /* --- Event Cards --- */
 .eventList {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  flex-direction: row;
   gap: 20px;
 }
 
 .eventCard {
+  width: 300px;
+  height: 300px;
   background: white;
-  border-radius: 15px;
   display: flex;
+  flex-direction: column;
+  border-radius: 15px;
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+
+.eventCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.3s ease;
+}
+
+.eventCard:hover::before {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .eventCard:hover {
-  background-color: #f9f9f9;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
 .cardLeftBorder {
@@ -171,6 +189,34 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.titleContainer {
+  background-color: #ffffff;
+  border-radius: 25px;
+  margin-left: 10px ;
+  margin-top: 10px;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  justify-items: center;
+  align-items: center;
+  height: fit-content;
+  width: fit-content;
+  max-width: 150px;
+}
+
+.titleContainer p {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eventInfo {
@@ -209,24 +255,26 @@
 
 .cardActions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
   gap: 10px;
-  padding: 0 20px;
+  padding: 10px 0;
   background: #f8fafc;
   border-left: 1px solid #e2e8f0;
-  animation: slideInRight 0.2s ease;
+  animation: slideInUp 0.2s ease;
+  margin-top: auto;
+  width: 100%;
+  z-index: 1;
 }
 
-@keyframes slideInRight {
+@keyframes slideInUp {
   from {
+    transform: translateY(40px);
     opacity: 0;
-    transform: translateX(20px);
   }
-
   to {
+    transform: translateY(0);
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -1505,6 +1553,7 @@
   /* Event Cards */
   .eventList {
     gap: 12px;
+    justify-content: center;
   }
 
   .eventCard {
