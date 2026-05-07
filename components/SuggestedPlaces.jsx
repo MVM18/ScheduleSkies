@@ -229,8 +229,17 @@ export default function SuggestedPlaces({ places = [] }) {
               </button>
             </div>
           ) : placesData.length === 0 ? (
-            <div className={styles.empty_state}>
-              <p>No places found nearby...</p>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '24px',
+              textAlign: 'center',
+              gap: '8px',
+            }}>
+              <p style={{ fontSize: '12px', fontWeight: 600 }}>
+                No places found...
+              </p>
             </div>
           ) : (
             placesData.map((place) => (

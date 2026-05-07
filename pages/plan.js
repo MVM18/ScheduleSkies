@@ -47,9 +47,11 @@ const MyEvents = () => {
   };
 
   const fetchEvents = async () => {
+    setLoading(true);
     const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
     if (data && !error) {
       setEventData(data.map(generateDynamicProps));
+      setLoading(false);
     }
   };
 
@@ -60,6 +62,7 @@ const MyEvents = () => {
   const [userLocation, setUserLocation] = useState('Locating...');
   const [currentDate, setCurrentDate] = useState('');
   const [temperature, setTemperature] = useState('--');
+  const [loading, setLoading] = useState(true);
 
   // Modal & Form States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -1192,20 +1195,7 @@ const MyEvents = () => {
 
         {/* Filter Bar */}
         <div className={styles.filterBar}>
-          {/* Desktop: category buttons */}
-          <div className={styles.filterBtnsDesktop}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                className={`${styles.filterBtn} ${activeFilter === cat ? styles.activeFilter : ''}`}
-                onClick={() => setActiveFilter(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile: category dropdown */}
+          {/* Category dropdown */}
           <div className={styles.filterDropdownMobile}>
             <select
               className={styles.mobileSelect}
@@ -1286,7 +1276,12 @@ const MyEvents = () => {
         )}
 
         {/* Event List */}
-        <section className={styles.eventList}>
+        {loading ? (
+            <div className="spinner-container">
+              <div className="loading-spinner"></div>
+            </div>
+          ) : (
+            <section className={styles.eventList}>
           {filteredEvents.length === 0 ? (
             <div className={styles.emptyState}>
               {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
@@ -1324,8 +1319,14 @@ const MyEvents = () => {
                   {/* Conditionally Render Edit/Delete Actions */}
                   {isEditListMode && (
                     <div className={styles.cardActions}>
-                      <button onClick={() => handleOpenEditForm(event)} className={styles.iconBtnEdit}>✎</button>
-                      <button onClick={() => handleDeleteEvent(event.id)} className={styles.iconBtnDelete}>🗑</button>
+                      <button onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditForm(event)
+                      }} className={styles.iconBtnEdit}>✎</button>
+                      <button onClick={() => {
+                        e.stopPropagation();
+                        handleDeleteEvent(event.id)
+                        }} className={styles.iconBtnDelete}>🗑</button>
                     </div>
                   )}
                 </div>
@@ -1333,6 +1334,8 @@ const MyEvents = () => {
             })
           )}
         </section>
+          )
+        }
       </main>
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
@@ -1546,7 +1549,20 @@ const MyEvents = () => {
         <div className={styles.modalOverlay} onClick={() => setIsItineraryOpen(false)}>
           <div className={styles.itineraryModal} onClick={(e) => e.stopPropagation()}>
             {/* Gradient Header */}
-            <div className={styles.itineraryHeader}>
+            <div key={event.id} style={{
+              position: 'relative',
+              backgroundImage: `url(${selectedEventForItinerary.image_link})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              width: '100%',
+              height: '400px'
+            }} >
+              <button className={styles.itineraryCloseBtn} onClick={() => setIsItineraryOpen(false)}>✕</button>
+            </div>
+
+            {/* Body — Progress Bar + Timeline */}
+            <div className={styles.itineraryBody}>
               <div className={styles.itineraryHeaderContent}>
                 <div className={styles.itineraryHeaderTop}>
                   <div>
@@ -1555,7 +1571,6 @@ const MyEvents = () => {
                     </div>
                     <h2>{selectedEventForItinerary.title}</h2>
                   </div>
-                  <button className={styles.itineraryCloseBtn} onClick={() => setIsItineraryOpen(false)}>✕</button>
                 </div>
 
                 <div className={styles.venueInfoBar}>
@@ -1568,27 +1583,7 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
-                  {selectedEventForItinerary.start_datetime && (() => {
-                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
-                    return (
-                      <>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>📅</span>
-                          <div>
-                            <span className={styles.infoLabel}>Date</span>
-                            <span className={styles.infoValue}>{range.dateStr}</span>
-                          </div>
-                        </div>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>🕐</span>
-                          <div>
-                            <span className={styles.infoLabel}>Time</span>
-                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` — ${range.endTime}` : ''}</span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
+
                   {selectedEventForItinerary.location && (
                     <div
                       className={styles.venueInfoItem}
@@ -1609,12 +1604,24 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
+
+                  {selectedEventForItinerary.start_datetime && (() => {
+                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
+                    return (
+                      <>
+                        <div className={styles.venueInfoItem}>
+                          <span className={styles.infoIcon}>📅</span>
+                          <div>
+                            <span className={styles.infoLabel}>Date & Time</span>
+                            <span className={styles.infoValue}>{range.dateStr}</span>
+                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` - ${range.endTime}` : ''}</span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
-
-            {/* Body — Progress Bar + Timeline */}
-            <div className={styles.itineraryBody}>
 
               {/* Progress Bar */}
               {activities.length > 0 && (

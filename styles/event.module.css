@@ -111,7 +111,7 @@
 .actionGroup {
   display: flex;
   gap: 12px;
-  margin-left: auto;
+  margin-left: 16px;
 }
 
 .actionBtn {
@@ -264,7 +264,7 @@
   animation: slideInUp 0.2s ease;
   margin-top: auto;
   width: 100%;
-  z-index: 1;
+  z-index: 100;
 }
 
 @keyframes slideInUp {
@@ -833,6 +833,7 @@
   color: white;
   position: relative;
   overflow: hidden;
+
 }
 
 .itineraryHeader::before {
@@ -858,8 +859,14 @@
 }
 
 .itineraryHeaderContent {
+  background-color: #ffffff;
   position: relative;
   z-index: 1;
+  border-radius: 15px;
+  padding: 1rem;
+  margin-bottom: 10px;
+  border: 1px solid #e8edf2;
+  box-shadow: 0 2px 10px #0000000d;
 }
 
 .itineraryHeaderTop {
@@ -890,6 +897,9 @@
   justify-content: center;
   transition: background 0.2s;
   flex-shrink: 0;
+  position: absolute;
+  right: 10px;
+  top: 10px;
 }
 
 .itineraryCloseBtn:hover {
@@ -929,6 +939,10 @@
 .venueInfoItem .infoValue {
   font-weight: 600;
   font-size: 13px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 /* --- Itinerary Body --- */
@@ -1419,10 +1433,7 @@
   opacity: 0.5;
 }
 
-/* --- Mobile Category Dropdown --- */
-.filterDropdownMobile {
-  display: none;
-}
+
 
 .mobileSelect {
   padding: 10px 16px;
@@ -1729,7 +1740,7 @@
 [data-theme='dark'] .eventCard,
 [data-theme='dark'] .formModal,
 [data-theme='dark'] .formGroup input, 
-[data-theme='dark'] .formGroup select {
+[data-theme='dark'] .formGroup select, [data-theme='dark'] .titleContainer {
   background-color: #1e293b;
   color: #e2e8f0;
   border-color: #334155;
