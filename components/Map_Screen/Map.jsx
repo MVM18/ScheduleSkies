@@ -4,7 +4,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, useMapEvents 
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix Leaflet icon issue
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -16,7 +15,6 @@ const GEOAPIFY_API_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
 const WEATHER_API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
 const mapStyle = 'osm-bright';
 
-// Helper: create standard pin icon with color
 const createIcon = (color) => L.divIcon({
   className: '',
   html: `<div style="
@@ -29,7 +27,6 @@ const createIcon = (color) => L.divIcon({
   iconAnchor: [9, 18],
 });
 
-// Helper: create highlighted pin (larger, with glow)
 const createHighlightedIcon = (color) => L.divIcon({
   className: '',
   html: `<div style="
@@ -70,7 +67,6 @@ const userLocationIconHighlight = L.divIcon({
   iconAnchor: [10, 10],
 });
 
-// Place type to icon/color mapping
 const getPlaceEmoji = (type) => {
   switch (type) {
     case 'restaurant': return '🍽️';
@@ -95,7 +91,6 @@ const getPlaceColor = (type) => {
   }
 };
 
-// Create dynamic place marker icon (with optional highlight)
 const createPlaceIcon = (type, isHighlighted = false) => {
   const emoji = getPlaceEmoji(type);
   const size = isHighlighted ? 36 : 28;
@@ -124,7 +119,6 @@ function FlyTo({ coords }) {
   return null;
 }
 
-// Click handler for pick mode (returns latlng for pinning)
 function MapPickClickHandler({ enabled, onLatLngClick }) {
   useMapEvents({
     click(e) {
@@ -134,7 +128,6 @@ function MapPickClickHandler({ enabled, onLatLngClick }) {
   return null;
 }
 
-// NEW: Click handler for normal mode: sets clicked location as user's location (origin)
 function MapSetOriginHandler({ enabled, onSetOrigin }) {
   useMapEvents({
     click(e) {
@@ -157,7 +150,6 @@ async function reverseGeocodeLatLng(lat, lng) {
   }
 }
 
-// Weather Widget Component (responsive)
 function WeatherWidget({ location, isMobile }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -382,7 +374,6 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon, isMobile })
   );
 }
 
-// Function to get traffic color based on segment position and time
 const getTrafficColor = (segmentIndex, totalSegments) => {
   const currentHour = new Date().getHours();
   const isWeekend = [0, 6].includes(new Date().getDay());
@@ -422,7 +413,6 @@ const getTrafficColor = (segmentIndex, totalSegments) => {
   }
 };
 
-// Function to split route into colored segments based on traffic
 const getRouteSegmentsWithTraffic = (routeCoords) => {
   if (!routeCoords || routeCoords.length < 2) return [];
 
@@ -443,7 +433,6 @@ const getRouteSegmentsWithTraffic = (routeCoords) => {
   return segments;
 };
 
-// Custom map controls component (responsive)
 function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute, isMobile }) {
   const map = useMap();
 
@@ -554,7 +543,6 @@ function MapControls({ onZoomIn, onZoomOut, onLocation, onRoute, isMobile }) {
   );
 }
 
-// Function to get traffic summary for the route
 const getTrafficSummary = (segments) => {
   if (!segments || segments.length === 0) {
     return {
@@ -626,7 +614,6 @@ const getMockPlaces = (routeCoords) => {
   ];
 };
 
-// Function to find places along the route
 const findPlacesAlongRoute = async (routeCoords) => {
   if (!routeCoords || routeCoords.length === 0) return [];
 
@@ -753,16 +740,13 @@ const MapScreen = ({
   const [placeRouteInfo, setPlaceRouteInfo] = useState(null);
   const [placeTypeFilter, setPlaceTypeFilter] = useState('all');
 
-  // State for highlighting selected marker (pin)
   const [selectedMarker, setSelectedMarker] = useState(null);
 
   const defaultPosition = [10.3204, 123.9242];
 
-  // Itinerary waypoints state
   const [waypointsList, setWaypointsList] = useState([]);
   const [currentWaypointIndex, setCurrentWaypointIndex] = useState(0);
 
-  // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -772,7 +756,6 @@ const MapScreen = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Auto-navigate to venue when venueCoords prop is provided (from itinerary)
   useEffect(() => {
     if (venueCoords && venueCoords.lat && venueCoords.lng) {
       const venueDest = {
@@ -786,19 +769,16 @@ const MapScreen = ({
     }
   }, [venueCoords]);
 
-  // Auto-fill destination text when searchLabel is provided (activity location without coords)
   useEffect(() => {
     if (searchLabel) {
       setDestText(searchLabel);
     }
   }, [searchLabel]);
 
-  // Auto-load itinerary waypoints
   useEffect(() => {
     if (itineraryWaypoints && itineraryWaypoints.length > 0) {
       setWaypointsList(itineraryWaypoints);
       setCurrentWaypointIndex(0);
-      // Set first waypoint with coordinates as destination
       const first = itineraryWaypoints.find(w => w.lat && w.lng);
       if (first) {
         const dest = { lat: first.lat, lng: first.lng, label: first.label || 'Waypoint 1' };
@@ -860,7 +840,6 @@ const MapScreen = ({
     router.push(returnPath);
   };
 
-  // Navigate to next waypoint
   const goToNextWaypoint = () => {
     const nextIdx = currentWaypointIndex + 1;
     if (nextIdx < waypointsList.length) {
@@ -871,7 +850,6 @@ const MapScreen = ({
         setDestination(dest);
         setDestText(dest.label);
         setFlyTo([dest.lat, dest.lng]);
-        // Route from current destination to next
         if (destination) {
           setOrigin(destination);
           setOriginText(destination.label);
@@ -880,7 +858,6 @@ const MapScreen = ({
     }
   };
 
-  // Get user's current location
   const getUserLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -913,7 +890,6 @@ const MapScreen = ({
     }
   };
 
-  // Handle map click to set as origin (your location)
   const handleMapSetOrigin = async (latlng) => {
     if (pickMode) return;
     const name = await reverseGeocodeLatLng(latlng.lat, latlng.lng);
@@ -1151,7 +1127,6 @@ const MapScreen = ({
     { key: 'hotel', label: 'Hotels', icon: '🏨' },
   ];
 
-  // --- Shared map content (both desktop and mobile) ---
   const mapContent = (
     <>
       <TileLayer
@@ -1254,7 +1229,6 @@ const MapScreen = ({
     </>
   );
 
-  // --- DESKTOP LAYOUT (original, unchanged, includes pickMode card at top) ---
   if (!isMobile) {
     return (
       <div style={{ height: '100%', width: '100%', display: 'flex', fontFamily: "'Segoe UI', sans-serif", overflow: 'hidden', position: 'relative', pointerEvents: 'none' }}>
@@ -1556,7 +1530,6 @@ const MapScreen = ({
     );
   }
 
-  // --- MOBILE LAYOUT (full-screen map, floating overlays, with upgraded places cards) ---
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, fontFamily: "'Segoe UI', sans-serif", overflow: 'hidden', pointerEvents: 'auto' }}>
       {/* Fullscreen Map Container */}
@@ -1568,7 +1541,6 @@ const MapScreen = ({
 
       {/* Floating UI Elements - Mobile */}
       {pickMode ? (
-        // --- PICK MODE UI (mobile) - floating card at bottom ---
         <div style={{
           position: 'absolute',
           bottom: '20px',
@@ -1652,7 +1624,6 @@ const MapScreen = ({
           </div>
         </div>
       ) : (
-        // --- NORMAL MODE UI (weather, traffic, toggles, panels) ---
         <>
           {/* Top row: Weather and Traffic (side by side, left-aligned) */}
           <div style={{
