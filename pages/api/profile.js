@@ -63,20 +63,20 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
-      // Update profile preferences
-      const { full_name, budget_php, environment, pace, email_updates } = req.body;
+      // Keep profile updates minimal and resilient to schema drift.
+      const { full_name, email_updates } = req.body;
 
       const { data, error } = await supabase
         .from('profiles')
-        .update({
-          full_name,
-          budget_php: Number(budget_php),
-          environment,
-          pace,
-          email_updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
+        .upsert(
+          {
+            id: user.id,
+            full_name,
+            email_updates,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'id' }
+        )
         .select()
         .single();
 

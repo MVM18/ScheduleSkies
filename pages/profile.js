@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo } from 'react';
-import { FaUserEdit, FaCloud, FaMapMarkerAlt, FaCalendarAlt, FaMoon, FaSun, FaSignOutAlt, FaTrashAlt, FaPlus, FaTimes } from 'react-icons/fa';
+import { FaUserEdit, FaMapMarkerAlt, FaCalendarAlt, FaMoon, FaSun, FaSignOutAlt, FaTrashAlt, FaPlus, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient';
 import Sidebar from '../components/Sidebar';
 import profileStyles from '../styles/profile.module.css';
@@ -98,19 +98,17 @@ const ItineraryItem = ({ itinerary, onDelete, isDeleting }) => {
 
 const ProfilePage = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('Preferences');
+  const [activeTab, setActiveTab] = useState('Account');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
-  const [themeMode, setThemeMode] = useState('light');
+  const [themeMode, setThemeMode] = useState(null);
+  const [themeReady, setThemeReady] = useState(false);
 
   // Profile Data
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [budgetPhp, setBudgetPhp] = useState(5000);
-  const [environment, setEnvironment] = useState('Both');
-  const [pace, setPace] = useState('Relaxed');
   const [emailUpdates, setEmailUpdates] = useState(true);
 
   // Lists & Analytics
@@ -130,6 +128,7 @@ const ProfilePage = () => {
 
   // Password change
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
 
   const showMessage = (type, value) => {
@@ -143,18 +142,25 @@ const ProfilePage = () => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setThemeMode(savedTheme);
+    } else {
+      // Fallback to the global theme already applied by _app.js
+      const bodyTheme = document.body.getAttribute('data-theme');
+      setThemeMode(bodyTheme === 'dark' ? 'dark' : 'light');
     }
+    setThemeReady(true);
   }, []);
 
   // Apply theme to body
   useEffect(() => {
+    if (!themeReady || !themeMode) return;
     document.body.setAttribute('data-theme', themeMode);
-  }, [themeMode]);
+  }, [themeMode, themeReady]);
 
   // Persist theme
   useEffect(() => {
+    if (!themeReady || !themeMode) return;
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-  }, [themeMode]);
+  }, [themeMode, themeReady]);
 
   // Fetch profile data on mount
   useEffect(() => {
@@ -191,9 +197,6 @@ const ProfilePage = () => {
 
         // Set profile fields
         setFullName(data.profile?.full_name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User');
-        setBudgetPhp(data.profile?.budget_php || 5000);
-        setEnvironment(data.profile?.environment || 'Both');
-        setPace(data.profile?.pace || 'Relaxed');
         setEmailUpdates(data.profile?.email_updates !== false);
 
         // Set lists and analytics
@@ -230,9 +233,6 @@ const ProfilePage = () => {
         },
         body: JSON.stringify({
           full_name: fullName.trim(),
-          budget_php: Number(budgetPhp),
-          environment,
-          pace,
           email_updates: emailUpdates
         })
       });
@@ -305,6 +305,10 @@ const ProfilePage = () => {
       showMessage('error', 'Password must be at least 6 characters.');
       return;
     }
+    if (newPassword !== confirmPassword) {
+      showMessage('error', 'Password confirmation does not match.');
+      return;
+    }
 
     setSecurityLoading(true);
     setMessage('');
@@ -314,6 +318,7 @@ const ProfilePage = () => {
       if (error) throw error;
 
       setNewPassword('');
+      setConfirmPassword('');
       showMessage('success', 'Password updated successfully.');
     } catch (err) {
       showMessage('error', `Password update failed: ${err.message}`);
@@ -394,9 +399,7 @@ const ProfilePage = () => {
               <h1>{fullName || 'GUEST'}</h1>
               <p className={profileStyles.profileEmail}>{email}</p>
               <div className={profileStyles.quickStats}>
-                <span>{itineraries.length} itineraries</span>
-                <span>{locations.length} saved places</span>
-                <span>{analytics.trips_taken} trips</span>
+             
               </div>
             </div>
           </header>
@@ -404,7 +407,7 @@ const ProfilePage = () => {
           <div className={profileStyles.profileBody}>
             {/* Tab Navigation */}
             <div className={profileStyles.tabNav}>
-              {['Preferences', 'Itineraries & Locations', 'Analytics', 'Account'].map(tab => (
+              {[ 'Itineraries & Locations', 'Analytics', 'Account'].map(tab => (
                 <button
                   key={tab}
                   className={`${profileStyles.tabBtn} ${activeTab === tab ? profileStyles.tabBtnActive : ''}`}
@@ -424,98 +427,7 @@ const ProfilePage = () => {
 
             {/* Tab Content */}
             <div className={profileStyles.tabContent}>
-              {activeTab === 'Preferences' && (
-                <>
-                  <div className={profileStyles.cardGrid}>
-                    <div className={profileStyles.card}>
-                      <h3><FaUserEdit /> Profile Information</h3>
-                      <div className={profileStyles.optionGroup}>
-                        <label className={profileStyles.optionLabel}>Display Name</label>
-                        <input
-                          type="text"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className={profileStyles.profileInput}
-                          placeholder="Your full name"
-                        />
-                      </div>
-                    </div>
-
-                    <div className={profileStyles.card}>
-                      <h3><FaCloud /> Travel Preferences</h3>
-                      <div className={profileStyles.optionGroup}>
-                        <label className={profileStyles.optionLabel}>Environment</label>
-                        <div className={profileStyles.optionsContainer}>
-                          {['Indoor', 'Outdoor', 'Both'].map(opt => (
-                            <button
-                              key={opt}
-                              type="button"
-                              className={`${profileStyles.optionBtn} ${environment === opt ? profileStyles.optionActive : ''}`}
-                              onClick={() => setEnvironment(opt)}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className={profileStyles.optionGroup}>
-                        <label className={profileStyles.optionLabel}>Pace</label>
-                        <div className={profileStyles.optionsContainer}>
-                          {['Relaxed', 'Moderate', 'Fast-paced'].map(opt => (
-                            <button
-                              key={opt}
-                              type="button"
-                              className={`${profileStyles.optionBtn} ${pace === opt ? profileStyles.optionActive : ''}`}
-                              onClick={() => setPace(opt)}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={profileStyles.card}>
-                      <h3>💰 Trip Budget (PHP)</h3>
-                      <div className={profileStyles.optionGroup}>
-                        <label className={profileStyles.optionLabel}>Budget Amount</label>
-                        <div className={profileStyles.budgetInputGroup}>
-                          <span className={profileStyles.currencySymbol}>₱</span>
-                          <input
-                            type="number"
-                            value={budgetPhp}
-                            onChange={(e) => setBudgetPhp(Number(e.target.value))}
-                            className={profileStyles.budgetInput}
-                            placeholder="5000"
-                            min="0"
-                            step="500"
-                          />
-                        </div>
-                        <small className={profileStyles.budgetHelper}>
-                          Recommended: ₱5,000 - ₱50,000 for day trips; ₱20,000+ for multi-day
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={profileStyles.actionButtons}>
-                    <button 
-                      className={profileStyles.primaryBtn}
-                      onClick={handleSaveProfile}
-                      disabled={saving}
-                    >
-                      {saving ? 'Saving...' : 'Save Preferences'}
-                    </button>
-                    <button
-                      className={profileStyles.logoutBtn}
-                      onClick={handleLogout}
-                    >
-                      <FaSignOutAlt /> Log Out
-                    </button>
-                  </div>
-                </>
-              )}
-
+             
               {activeTab === 'Itineraries & Locations' && (
                 <div className={profileStyles.cardGrid}>
                   <div className={profileStyles.card}>
@@ -604,7 +516,7 @@ const ProfilePage = () => {
                         Dark Mode
                       </button>
                     </div>
-                    <div className={profileStyles.toggleItem}>
+                   {/* <div className={profileStyles.toggleItem}>
                       <span>Email updates</span>
                       <label className={profileStyles.toggleSwitch}>
                         <input
@@ -614,9 +526,23 @@ const ProfilePage = () => {
                         />
                         <span className={profileStyles.slider}></span>
                       </label>
+                    </div>*/}
+                  </div>
+                  <div className={profileStyles.cardGrid}>
+                    <div className={profileStyles.card}>
+                      <h3><FaUserEdit /> Profile Information</h3>
+                      <div className={profileStyles.optionGroup}>
+                        <label className={profileStyles.optionLabel}>Display Name</label>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className={profileStyles.profileInput}
+                          placeholder="Your full name"
+                        />
+                      </div>
                     </div>
                   </div>
-
                   <div className={profileStyles.card}>
                     <h3>🔐 Security</h3>
                     <div className={profileStyles.optionGroup}>
@@ -627,6 +553,16 @@ const ProfilePage = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         className={profileStyles.profileInput}
                         placeholder="At least 6 characters"
+                      />
+                    </div>
+                    <div className={profileStyles.optionGroup}>
+                      <label className={profileStyles.optionLabel}>Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={profileStyles.profileInput}
+                        placeholder="Re-enter new password"
                       />
                     </div>
                     <div className={profileStyles.actionButtons}>
@@ -647,6 +583,21 @@ const ProfilePage = () => {
                         <FaTrashAlt /> Delete Account
                       </button>
                     </div>
+                  </div>
+                  <div className={profileStyles.actionButtons}>
+                    <button 
+                      className={profileStyles.primaryBtn}
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                    >
+                      {saving ? 'Saving...' : 'Save Profile'}
+                    </button>
+                    <button
+                      className={profileStyles.logoutBtn}
+                      onClick={handleLogout}
+                    >
+                      <FaSignOutAlt /> Log Out
+                    </button>
                   </div>
                 </div>
               )}

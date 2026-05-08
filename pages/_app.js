@@ -13,12 +13,31 @@ import '../styles/plan.css'
 import '../styles/dashboard.css'
 import '../styles/loading.css';
 
+const THEME_STORAGE_KEY = 'schedule-skies-theme'
+
 export default function App({ Component, pageProps }) {
   const router = useRouter()
   const [authChecked, setAuthChecked] = useState(false)
 
   const protectedPages = ['/dashboard', '/plan', '/map', '/profile']
   const isProtectedPage = protectedPages.includes(router.pathname)
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+    const nextTheme = savedTheme === 'dark' ? 'dark' : 'light'
+    document.body.setAttribute('data-theme', nextTheme)
+  }, [])
+
+  useEffect(() => {
+    const handleThemeStorageChange = (event) => {
+      if (event.key !== THEME_STORAGE_KEY) return
+      const nextTheme = event.newValue === 'dark' ? 'dark' : 'light'
+      document.body.setAttribute('data-theme', nextTheme)
+    }
+
+    window.addEventListener('storage', handleThemeStorageChange)
+    return () => window.removeEventListener('storage', handleThemeStorageChange)
+  }, [])
 
   useEffect(() => {
     let mounted = true
