@@ -20,6 +20,7 @@ import {
   buildItineraryEventDraft,
   buildActivityDraftsFromStructured,
 } from '@/lib/itineraryImportShared';
+import EventGalleryHeader from '@/components/EventGalleryHeader'
 
 const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
@@ -47,9 +48,11 @@ const MyEvents = () => {
   };
 
   const fetchEvents = async () => {
+    setLoading(true);
     const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
     if (data && !error) {
       setEventData(data.map(generateDynamicProps));
+      setLoading(false);
     }
   };
 
@@ -60,6 +63,7 @@ const MyEvents = () => {
   const [userLocation, setUserLocation] = useState('Locating...');
   const [currentDate, setCurrentDate] = useState('');
   const [temperature, setTemperature] = useState('--');
+  const [loading, setLoading] = useState(true);
 
   // Modal & Form States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -94,7 +98,7 @@ const MyEvents = () => {
   // Progress bar
   const [completedActivities, setCompletedActivities] = useState({});
 
-  const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null };
+  const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null, image_link: '' };
   const [formData, setFormData] = useState(initialFormState);
 
   // AI Suggestions State
@@ -131,6 +135,7 @@ const MyEvents = () => {
     if (!dt) return new Date().toISOString().split('T')[0];
     return dt.includes('T') ? dt.split('T')[0] : dt;
   };
+  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
 
   // Helper to display 24h string (14:30) as 12h string (2:30 PM)
   const formatDisplayTime = (time24) => {
@@ -450,7 +455,8 @@ const MyEvents = () => {
       start_datetime: formData.start_datetime ? new Date(formData.start_datetime).toISOString() : null,
       end_datetime: formData.end_datetime ? new Date(formData.end_datetime).toISOString() : null,
       latitude: formData.latitude || null,
-      longitude: formData.longitude || null
+      longitude: formData.longitude || null,
+      image_link: formData.image_link || PLACEHOLDER_IMAGE
     };
 
     if (editingId) {
@@ -507,15 +513,22 @@ const MyEvents = () => {
     }
   };
 
-  const handleSelectLocation = (loc) => {
+  const handleSelectLocation = async (loc) => {
     setFormData({
       ...formData,
       location: loc.display_name,
       latitude: parseFloat(loc.lat),
       longitude: parseFloat(loc.lon)
-    });
-    setLocationResults([]);
-  };
+    })
+    setLocationResults([])
+
+    // Fetch place image in background
+    const imageUrl = await fetchPlaceImage(loc.display_name)
+    setFormData(prev => ({
+      ...prev,
+      image_link: imageUrl || PLACEHOLDER_IMAGE
+    }))
+  }
 
   const handleActivityLocationSearch = async (val) => {
     setActivityForm({ ...activityForm, location: val, latitude: null, longitude: null });
@@ -1084,6 +1097,19 @@ const MyEvents = () => {
     return cellDays;
   };
 
+  const fetchPlaceImage = async (locationName) => {
+    try {
+      const res = await fetch(`/api/place-image?query=${encodeURIComponent(locationName)}`)
+      const data = await res.json()
+      return data.url || null
+    } catch (err) {
+      console.error('Place image fetch failed:', err)
+      return null
+    }
+  }
+
+  const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop'
+
   return (
     <div className={styles.appContainer}>
 
@@ -1218,20 +1244,7 @@ const MyEvents = () => {
 
         {/* Filter Bar */}
         <div className={styles.filterBar}>
-          {/* Desktop: category buttons */}
-          <div className={styles.filterBtnsDesktop}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                className={`${styles.filterBtn} ${activeFilter === cat ? styles.activeFilter : ''}`}
-                onClick={() => setActiveFilter(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile: category dropdown */}
+          {/* Category dropdown */}
           <div className={styles.filterDropdownMobile}>
             <select
               className={styles.mobileSelect}
@@ -1266,6 +1279,30 @@ const MyEvents = () => {
             >
               <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
             </button>
+
+            {/* View toggle */}
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'grid' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </button>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List view"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10.5" width="18" height="3" rx="1"/>
+                  <rect x="3" y="17" width="18" height="3" rx="1"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1312,112 +1349,121 @@ const MyEvents = () => {
         )}
 
         {/* Event List */}
-        <section className={styles.eventList}>
-          {filteredEvents.length === 0 ? (
-            <div className={styles.emptyState}>
-              {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+        {loading ? (
+            <div className="spinner-container">
+              <div className="loading-spinner"></div>
             </div>
           ) : (
-            filteredEvents.map(event => {
-              const status = getEventStatus(event);
-              return (
-                <div key={event.id} className={styles.eventCard} style={{ position: 'relative' }}>
-                  <div className={styles.cardLeftBorder} style={{ backgroundColor: event.typeColor }}></div>
-
-                  {/* Status Badge */}
-                  <span
-                    className={styles.cardStatusBadge}
-                    style={{
-                      background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                      color: status === 'done' ? '#15A862' : '#4396D1'
+            <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
+              {filteredEvents.length === 0 ? (
+                <div className={styles.emptyState}>
+                  {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+                </div>
+              ) : viewMode === 'grid' ? (
+                // ── GRID VIEW (existing) ──────────────────────────────────────────────
+                filteredEvents.map(event => {
+                  const status = getEventStatus(event)
+                  return (
+                    <div key={event.id} className={styles.eventCard} style={{
+                      position: 'relative',
+                      backgroundImage: `url(${event.image_link})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
                     }}
-                  >
-                    {status === 'done' ? '✅ Done' : '🔜 Upcoming'}
-                  </span>
-
-                  <div className={styles.cardBody}>
-                    <div className={styles.eventInfo}>
-                      <div className={styles.avatar}>
-                        {event.title.substring(0, 2).toUpperCase()}
+                    onClick={() => handleOpenItinerary(event)}>
+                      <span>
+                        <div className={styles.titleContainer}>
+                          <p>{event.title}</p>
+                        </div>
+                      </span>
+                      <span
+                        className={styles.cardStatusBadge}
+                        style={{
+                          background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                          color: status === 'done' ? '#15A862' : '#4396D1',
+                          border: '0.5px solid black'
+                        }}
+                      >
+                        {status === 'done' ? 'Done' : 'Upcoming'}
+                      </span>
+                      {isEditListMode && (
+                        <div className={styles.cardActions}>
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                // ── LIST VIEW ─────────────────────────────────────────────────────────
+                filteredEvents.map(event => {
+                  const status = getEventStatus(event)
+                  const range = event.start_datetime ? formatDateRange(event.start_datetime, event.end_datetime) : null
+                  return (
+                    <div
+                      key={event.id}
+                      className={styles.eventListItem}
+                      onClick={() => handleOpenItinerary(event)}
+                    >
+                      {/* Thumbnail */}
+                      <div className={styles.listThumb}>
+                        {event.image_link
+                          ? <img src={event.image_link} alt={event.title} />
+                          : <div className={styles.listThumbPlaceholder}>{event.category[0]}</div>
+                        }
                       </div>
-                      <div className={styles.details}>
-                        <h3>{event.title}</h3>
-                        <p>{event.location} • {event.price}</p>
 
-                        {/* Enhanced meta info */}
-                        <div className={styles.eventMeta}>
+                      {/* Main info */}
+                      <div className={styles.listInfo}>
+                        <div className={styles.listTitle}>{event.title}</div>
+                        <div className={styles.listMeta}>
                           {event.venue && <span>🏛️ {event.venue}</span>}
-                          {event.start_datetime ? (
-                            <span>📅 {formatDateTime(event.start_datetime)}</span>
-                          ) : event.date ? (
-                            <span>📅 {event.date}</span>
-                          ) : null}
-                          {event.end_datetime && <span>→ {formatTime(event.end_datetime)}</span>}
-                        </div>
-
-                        <div className={styles.tagRow}>
-                          {event.tags.map((tag, index) => (
-                            <span key={index} className={`${styles.tag} ${tag.styleClass}`}>
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-
-                        {event.aiSuggestion && (
-                          <div className={styles.tagRow}>
-                            <div className={styles.aiBox}>{event.aiSuggestion}</div>
-                          </div>
-                        )}
-
-                        {/* Itinerary, Share, Budget & Navigate Buttons */}
-                        <div className={styles.cardBtnRow}>
-                          <button
-                            className={styles.itineraryBtn}
-                            onClick={() => handleOpenItinerary(event)}
-                          >
-                            📋 Itinerary
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #4A90D9, #6D7DB9)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForShare(event); setIsShareModalOpen(true); }}
-                          >
-                            🔗 Share
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForBudget(event); setIsBudgetOpen(true); }}
-                          >
-                            💰 Budget
-                          </button>
-                          {(event.latitude && event.longitude) ? (
-                            <button
-                              className={styles.navigateBtn}
-                              onClick={() => handleNavigateToVenue(event)}
-                            >
-                              🧭 Navigate
-                            </button>
-                          ) : (
-                            <span className={styles.locationHint}>📍 Select location from search to enable navigation</span>
+                          <span>📍 {event.location}</span>
+                          {range && (
+                            <span>📅 {range.dateStr} · {range.startTime}{range.endTime ? ` – ${range.endTime}` : ''}</span>
                           )}
                         </div>
+                        <div className={styles.listTags}>
+                          <span
+                            className={styles.listCategoryTag}
+                            style={{ background: event.typeColor + '22', color: event.typeColor, border: `1px solid ${event.typeColor}44` }}
+                          >
+                            {event.category}
+                          </span>
+                          {event.price && <span className={styles.listPriceTag}>💰 {event.price}</span>}
+                        </div>
+                      </div>
+
+                      {/* Status + actions */}
+                      <div className={styles.listRight}>
+                        <span
+                          className={styles.cardStatusBadge}
+                          style={{
+                            background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                            color: status === 'done' ? '#15A862' : '#4396D1',
+                            border: '0.5px solid black',
+                            position: 'static',
+                            marginBottom: isEditListMode ? '8px' : '0'
+                          }}
+                        >
+                          {status === 'done' ? 'Done' : 'Upcoming'}
+                        </span>
+                        {isEditListMode && (
+                          <div className={styles.listActions}>
+                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Conditionally Render Edit/Delete Actions */}
-                  {isEditListMode && (
-                    <div className={styles.cardActions}>
-                      <button onClick={() => handleOpenEditForm(event)} className={styles.iconBtnEdit}>✎</button>
-                      <button onClick={() => handleDeleteEvent(event.id)} className={styles.iconBtnDelete}>🗑</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </section>
+                  )
+                })
+              )}
+            </section>
+          )
+        }
       </main>
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
@@ -1482,11 +1528,41 @@ const MyEvents = () => {
                     🗺️ Pick on map
                   </button>
                 </div>
+
                 <div className={styles.formGroup}>
                   <label>Price / Cost</label>
                   <input required type="text" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder="e.g. ₱350/Person" />
                 </div>
               </div>
+
+              {formData.image_link && (
+                  <div style={{
+                    marginTop: '8px',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    height: '120px',
+                    width: '100%',
+                    position: 'relative',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <img
+                      src={formData.image_link}
+                      alt="Location preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0, left: 0, right: 0,
+                      padding: '6px 10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      fontSize: '10px',
+                      color: '#fff',
+                      fontWeight: 500
+                    }}>
+                      {formData.image_link.includes('unsplash') ? '🖼️ Placeholder image' : '📍 Location photo from Google'}
+                    </div>
+                  </div>
+                )}
 
               {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI */}
               <div className={styles.formRow}>
@@ -1634,8 +1710,19 @@ const MyEvents = () => {
       {isItineraryOpen && selectedEventForItinerary && (
         <div className={styles.modalOverlay} onClick={() => setIsItineraryOpen(false)}>
           <div className={styles.itineraryModal} onClick={(e) => e.stopPropagation()}>
-            {/* Gradient Header */}
-            <div className={styles.itineraryHeader}>
+            
+            {/* Gallery Header */}
+            <EventGalleryHeader
+              event={selectedEventForItinerary}
+              userId={userId}
+              onClose={() => setIsItineraryOpen(false)}
+              onCoverChange={(newUrl) => {
+                setSelectedEventForItinerary(prev => ({ ...prev, image_link: newUrl }))
+              }}
+            />
+
+            {/* Body — Progress Bar + Timeline */}
+            <div className={styles.itineraryBody}>
               <div className={styles.itineraryHeaderContent}>
                 <div className={styles.itineraryHeaderTop}>
                   <div>
@@ -1643,8 +1730,8 @@ const MyEvents = () => {
                       Event Itinerary
                     </div>
                     <h2>{selectedEventForItinerary.title}</h2>
+                    <span className={styles.activityCount}>{activities.length} ACTIVIT{activities.length === 1 ? 'Y' : 'IES'}</span>
                   </div>
-                  <button className={styles.itineraryCloseBtn} onClick={() => setIsItineraryOpen(false)}>✕</button>
                 </div>
 
                 <div className={styles.venueInfoBar}>
@@ -1657,27 +1744,7 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
-                  {selectedEventForItinerary.start_datetime && (() => {
-                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
-                    return (
-                      <>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>📅</span>
-                          <div>
-                            <span className={styles.infoLabel}>Date</span>
-                            <span className={styles.infoValue}>{range.dateStr}</span>
-                          </div>
-                        </div>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>🕐</span>
-                          <div>
-                            <span className={styles.infoLabel}>Time</span>
-                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` — ${range.endTime}` : ''}</span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
+
                   {selectedEventForItinerary.location && (
                     <div
                       className={styles.venueInfoItem}
@@ -1698,12 +1765,24 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
+
+                  {selectedEventForItinerary.start_datetime && (() => {
+                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
+                    return (
+                      <>
+                        <div className={styles.venueInfoItem}>
+                          <span className={styles.infoIcon}>📅</span>
+                          <div>
+                            <span className={styles.infoLabel}>Date & Time</span>
+                            <span className={styles.infoValue}>{range.dateStr}</span>
+                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` - ${range.endTime}` : ''}</span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
-
-            {/* Body — Progress Bar + Timeline */}
-            <div className={styles.itineraryBody}>
 
               {/* Progress Bar */}
               {activities.length > 0 && (
@@ -1947,7 +2026,6 @@ const MyEvents = () => {
 
             {/* Footer */}
             <div className={styles.itineraryFooter}>
-              <span className={styles.activityCount}>{activities.length} activit{activities.length === 1 ? 'y' : 'ies'}</span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   className={styles.navigateBtnLg}

@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.photos,places.types,places.userRatingCount'
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.photos,places.types,places.userRatingCount,places.currentOpeningHours,places.primaryTypeDisplayName,places.reviews,places.editorialSummary,places.location'
         },
         body: JSON.stringify({
           maxResultCount: parseInt(limit) || 10,
