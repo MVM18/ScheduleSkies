@@ -167,9 +167,6 @@ create policy "Users can delete their own events" on public.events for delete us
 
 -- 1. ALTER PROFILES TABLE TO INCLUDE NEW FIELDS
 -- ============================================================================
-ALTER TABLE public.profiles ADD COLUMN budget_php NUMERIC DEFAULT 5000;
-ALTER TABLE public.profiles ADD COLUMN environment TEXT DEFAULT 'Both';
-ALTER TABLE public.profiles ADD COLUMN pace TEXT DEFAULT 'Relaxed';
 ALTER TABLE public.profiles ADD COLUMN email_updates BOOLEAN DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
 
@@ -265,7 +262,7 @@ CREATE POLICY "Users can update their own analytics"
   ON public.user_analytics FOR UPDATE
   USING (auth.uid() = user_id);
 
--- 5. UPDATE EXISTING HANDLE_NEW_USER TRIGGER TO INCLUDE ANALYTICS & EXTENDED PROFILE
+-- 5. UPDATE EXISTING HANDLE_NEW_USER TRIGGER TO INCLUDE ANALYTICS & PROFILE DEFAULTS
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -273,22 +270,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  -- Insert profile with extended fields
+  -- Insert profile defaults used by /profile page
   INSERT INTO public.profiles (
     id,
     full_name,
-    budget_php,
-    environment,
-    pace,
     email_updates,
     created_at
   )
   VALUES (
     new.id,
     new.raw_user_meta_data ->> 'full_name',
-    5000, -- Default budget: 5000 PHP
-    'Both', -- Default environment
-    'Relaxed', -- Default pace
     true, -- Default email updates enabled
     now()
   )

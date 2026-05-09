@@ -6,8 +6,14 @@
  * and calls Google Gemini API to generate smart travel responses.
  */
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_BACKUP,
+  process.env.GOOGLE_GEMINI_API_KEY,
+  process.env.GOOGLE_GEMINI_API_KEY_BACKUP,
+  process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+].filter(Boolean);
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 const SYSTEM_PROMPT = `You are SkyBot, the AI travel assistant for ScheduleSkies — a smart travel planning app focused on Cebu, Philippines.
 
@@ -39,7 +45,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!GEMINI_API_KEY) {
+  if (GEMINI_KEYS.length === 0) {
     // Fallback: provide a helpful response without the API
     return res.status(200).json({
       reply: getFallbackResponse(req.body.message, req.body.context),
@@ -84,44 +90,52 @@ export default async function handler(req, res) {
       contextPrompt += `\n\n🌡️ CURRENT WEATHER: ${context.currentWeather.temp}°C, ${context.currentWeather.description} in ${context.currentWeather.city}`;
     }
 
-    // Call Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    let aiReply = null;
+    let lastGeminiError = null;
 
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }]
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: message + contextPrompt }]
+    for (const geminiKey of GEMINI_KEYS) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
+
+      const geminiResponse = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: message + contextPrompt }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.9,
+            maxOutputTokens: 1024,
           }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.9,
-          maxOutputTokens: 1024,
-        }
-      })
-    });
+        })
+      });
 
-    if (!geminiResponse.ok) {
-      const errorData = await geminiResponse.text();
-      console.error('Gemini API error:', errorData);
-      // Fall back to local response
+      if (!geminiResponse.ok) {
+        lastGeminiError = await geminiResponse.text();
+        continue;
+      }
+
+      const geminiData = await geminiResponse.json();
+      aiReply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      if (aiReply) break;
+      lastGeminiError = 'Gemini returned an empty response.';
+    }
+
+    if (!aiReply) {
+      console.error('Gemini API error:', lastGeminiError);
       return res.status(200).json({
         reply: getFallbackResponse(message, context),
         suggestions: getQuickSuggestions(message),
         source: 'fallback'
       });
     }
-
-    const geminiData = await geminiResponse.json();
-    const aiReply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text 
-      || 'Sorry, I couldn\'t generate a response. Please try again.';
 
     return res.status(200).json({
       reply: aiReply,

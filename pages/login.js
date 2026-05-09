@@ -3,11 +3,14 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
+import { safeAppPath } from '@/lib/itineraryImportShared'
 import styles from '@/styles/auth.module.css'
 import { FaEye, FaEyeSlash } from 'react-icons/fa'
 
 export default function LoginPage() {
   const router = useRouter()
+  const returnTo = typeof router.query.returnTo === 'string' ? router.query.returnTo : ''
+  const signupHref = returnTo ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : '/signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -31,7 +34,11 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/')
+    const next = safeAppPath(
+      typeof router.query.returnTo === 'string' ? router.query.returnTo : '/dashboard',
+      '/dashboard'
+    )
+    router.push(next)
   }
 
   return (
@@ -96,7 +103,7 @@ export default function LoginPage() {
           </form>
 
           <p className={styles.footerText}>
-            Don&apos;t have an account? <Link href="/signup" className={styles.link}>Sign up</Link>
+            Don&apos;t have an account? <Link href={signupHref} className={styles.link}>Sign up</Link>
           </p>
         </section>
       </main>

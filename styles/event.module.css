@@ -15,7 +15,7 @@
 .mainContent {
   flex: 1;
   margin-left: 80px;
-  padding: 40px 60px;
+  padding: 40px 60px 100px;
   position: relative;
   z-index: 1;
   display: flex;
@@ -111,17 +111,17 @@
 .actionGroup {
   display: flex;
   gap: 12px;
-  margin-left: auto;
+  margin-left: 16px;
 }
 
 .actionBtn {
   background: white;
   border: 1px solid #76b5d9;
   color: #333;
-  padding: 8px 20px;
+  padding: 8px 10px;
   border-radius: 20px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -144,21 +144,39 @@
 /* --- Event Cards --- */
 .eventList {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  flex-direction: row;
   gap: 20px;
 }
 
 .eventCard {
+  width: 300px;
+  height: 300px;
   background: white;
-  border-radius: 15px;
   display: flex;
+  flex-direction: column;
+  border-radius: 15px;
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+
+.eventCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.3s ease;
+}
+
+.eventCard:hover::before {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .eventCard:hover {
-  background-color: #f9f9f9;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
 .cardLeftBorder {
@@ -171,6 +189,34 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.titleContainer {
+  background-color: #ffffff;
+  border-radius: 25px;
+  margin-left: 10px ;
+  margin-top: 10px;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  justify-items: center;
+  align-items: center;
+  height: fit-content;
+  width: fit-content;
+  max-width: 150px;
+}
+
+.titleContainer p {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eventInfo {
@@ -209,24 +255,26 @@
 
 .cardActions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
   gap: 10px;
-  padding: 0 20px;
+  padding: 10px 0;
   background: #f8fafc;
   border-left: 1px solid #e2e8f0;
-  animation: slideInRight 0.2s ease;
+  animation: slideInUp 0.2s ease;
+  margin-top: auto;
+  width: 100%;
+  z-index: 100;
 }
 
-@keyframes slideInRight {
+@keyframes slideInUp {
   from {
+    transform: translateY(40px);
     opacity: 0;
-    transform: translateX(20px);
   }
-
   to {
+    transform: translateY(0);
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -410,6 +458,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  margin-left: 80px;
 }
 
 .calendarModal {
@@ -548,6 +597,164 @@
   filter: brightness(1.1);
 }
 
+.viewToggle {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 0 5px;
+}
+
+.viewToggleBtn {
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+  border-radius: 20px;
+}
+
+.viewToggleBtn:hover {
+  color: rgba(0, 0, 0, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.viewToggleActive {
+  background: rgba(118, 181, 217, 0.2) !important;
+  color: #76b5d9 !important;
+}
+
+.eventListView {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventListItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+
+.eventListItem:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(118, 181, 217, 0.3);
+  transform: translateX(2px);
+}
+
+.listThumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.listThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.listThumbPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+}
+
+.listInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.listTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.listMeta span {
+  font-size: 11.5px;
+  color: #000;
+  white-space: normal; 
+  overflow: visible; 
+  text-overflow: unset;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.listTags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.listCategoryTag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+}
+
+.listPriceTag {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.listRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.listActions {
+  display: flex;
+  gap: 6px;
+}
+
 .formModal {
   background: #ffffff;
   width: 100%;
@@ -556,8 +763,13 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   animation: modalPopUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 90%;
+  overflow-y: auto;
+}
+
+.formModal::-webkit-scrollbar {
+  display: none;              /* Hide Scrollbar */
 }
 
 @keyframes modalPopUp {
@@ -767,7 +979,7 @@
 /* --- Itinerary Modal --- */
 .itineraryModal {
   background: #ffffff;
-  width: 95%;
+  width: 90%;
   max-width: 720px;
   max-height: 90vh;
   border-radius: 24px;
@@ -785,6 +997,7 @@
   color: white;
   position: relative;
   overflow: hidden;
+
 }
 
 .itineraryHeader::before {
@@ -810,8 +1023,14 @@
 }
 
 .itineraryHeaderContent {
+  background-color: #ffffff;
   position: relative;
   z-index: 1;
+  border-radius: 15px;
+  padding: 1rem;
+  margin-bottom: 10px;
+  border: 1px solid #e8edf2;
+  box-shadow: 0 2px 10px #0000000d;
 }
 
 .itineraryHeaderTop {
@@ -826,22 +1045,6 @@
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.3px;
-}
-
-.itineraryCloseBtn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-  flex-shrink: 0;
 }
 
 .itineraryCloseBtn:hover {
@@ -860,7 +1063,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.95;
 }
 
@@ -881,6 +1084,10 @@
 .venueInfoItem .infoValue {
   font-weight: 600;
   font-size: 13px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 /* --- Itinerary Body --- */
@@ -1125,7 +1332,7 @@
   background: white;
   border-top: 1px solid #e8edf2;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
 }
 
@@ -1133,7 +1340,7 @@
   background: linear-gradient(135deg, #2C5282, #4A90D9);
   color: white;
   border: none;
-  padding: 10px 24px;
+  padding: 10px 12px;
   border-radius: 14px;
   font-size: 14px;
   font-weight: 700;
@@ -1151,9 +1358,9 @@
 }
 
 .activityCount {
-  font-size: 13px;
+  font-size: 10px;
   color: #64748b;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 /* --- Empty Itinerary --- */
@@ -1371,10 +1578,7 @@
   opacity: 0.5;
 }
 
-/* --- Mobile Category Dropdown --- */
-.filterDropdownMobile {
-  display: none;
-}
+
 
 .mobileSelect {
   padding: 10px 16px;
@@ -1404,13 +1608,21 @@
   display: none;
 }
 
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .mainContent {
+    margin-left: 0;
+    padding: 20px 20px 120px; /* Increased bottom padding for mobile nav */
+  }
+}
+
 /* ========================================
    MOBILE RESPONSIVE
    ======================================== */
 @media (max-width: 768px) {
   .mainContent {
     margin-left: 0;
-    padding: 16px 14px 150px 14px;
+    padding: 20px 20px 120px; /* Increased bottom padding for mobile nav */
   }
 
   /* Header */
@@ -1497,6 +1709,7 @@
   /* Event Cards */
   .eventList {
     gap: 12px;
+    justify-content: center;
   }
 
   .eventCard {
@@ -1560,8 +1773,8 @@
   }
 
   .modalOverlay {
-    align-items: flex-end;
-    padding-bottom: 120px;
+    margin-left: 0;
+    z-index: 10000;
   }
 
   .formModal {
@@ -1592,8 +1805,7 @@
 
   .itineraryModal {
     max-width: 100%;
-    max-height: 95vh;
-    border-radius: 16px 16px 0 0;
+    max-height: 90vh;
   }
 
   .itineraryHeader {
@@ -1609,26 +1821,60 @@
     gap: 8px;
   }
 
+  .venueInfoItem .infoIcon, .venueInfoItem .infoLabel, .venueInfoItem .infoValue{
+    font-size: 10px;
+  }
+
+  .activityName {
+    font-size: 12px;
+  }
+
+  .activityTime .timeBadge {
+    font-size: 8px;
+  }
+
   .itineraryBody {
     padding: 16px 16px;
   }
 
+  .progressLabel {
+    font-size: 10px;
+  }
+
+  .progressPercent {
+    font-size: 10px;
+  }
+
   .itineraryFooter {
     padding: 12px 16px;
-    flex-direction: column;
     gap: 10px;
   }
 
   .navigateBtnLg {
-    width: 100%;
+    font-size: 10px;
     justify-content: center;
-    padding: 12px;
+    padding: 6px;
+  }
+
+  .activityLocation {
+    font-size: 10px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+  }
+
+  .activityActions button {
+    font-size: 8px;
   }
 
   .activityFormGrid {
     grid-template-columns: 1fr;
   }
 
+  .addActivityBtn {
+    font-size: 12px;
+  }
   /* Calendar Modal */
   .calendarModal {
     width: 100%;
@@ -1648,6 +1894,26 @@
   .sun,
   .cloud {
     display: none;
+  }
+}
+
+@media (max-width: 650px){
+  .eventCard {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .titleContainer {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .titleContainer p {
+    font-size: 10px;
+  }
+
+  .cardStatusBadge {
+    font-size: 8px;
+    top: 80%;
   }
 }
 
@@ -1672,7 +1938,18 @@
 [data-theme='dark'] .eventCard,
 [data-theme='dark'] .formModal,
 [data-theme='dark'] .formGroup input, 
-[data-theme='dark'] .formGroup select {
+[data-theme='dark'] .formGroup select, 
+[data-theme='dark'] .titleContainer,
+[data-theme='dark'] .itineraryBody,
+[data-theme='dark'] .itineraryHeaderContent,
+[data-theme='dark'] .progressContainer,
+[data-theme='dark'] .progressLabel,
+[data-theme='dark'] .activityCard,
+[data-theme='dark'] .activityName,
+[data-theme='dark'] .activityLocation,
+[data-theme='dark'] .searchBar input,
+[data-theme='dark'] .addActivityBtn,
+[data-theme='dark'] .itineraryFooter {
   background-color: #1e293b;
   color: #e2e8f0;
   border-color: #334155;
@@ -1681,4 +1958,215 @@
 [data-theme='dark'] .pill,
 [data-theme='dark'] .details p {
   color: #a0aec0;
+}
+
+[data-theme="dark"] .eventListItem {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .eventListItem:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(118, 181, 217, 0.35);
+}
+
+[data-theme="dark"] .listTitle {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .listMeta span {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme="dark"] .listThumbPlaceholder {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .listPriceTag {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+[data-theme="dark"] .viewToggle {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .viewToggleBtn {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+[data-theme="dark"] .viewToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+[data-theme="dark"] .viewToggleActive {
+  background: rgba(118, 181, 217, 0.18) !important;
+  color: #76b5d9 !important;
+}
+
+@media (max-width: 768px) {
+
+  .actionGroup {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .actionBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .viewToggle {
+    margin-left: auto;
+  }
+
+  .viewToggleBtn {
+    padding: 6px 8px;
+  }
+
+  .eventList {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .eventCard {
+    height: 160px;
+  }
+
+  .eventListView {
+    gap: 6px;
+  }
+
+  .eventListItem {
+    padding: 10px 12px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .eventListItem:hover {
+    transform: none; /* disable slide on touch */
+  }
+
+  .listThumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+  }
+
+  .listThumbPlaceholder {
+    font-size: 18px;
+  }
+
+  .listTitle {
+    font-size: 13px;
+  }
+
+  .listMeta span {
+    font-size: 11px;
+  }
+
+  /* Hide address on very small screens, keep venue + date */
+  .listMeta span:nth-child(2) {
+    display: none;
+  }
+
+  .listTags {
+    gap: 4px;
+    margin-top: 1px;
+  }
+
+  .listCategoryTag,
+  .listPriceTag {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+
+  .listRight {
+    gap: 4px;
+  }
+
+  .cardStatusBadge {
+    font-size: 10px;
+    padding: 2px 7px;
+  }
+
+  .listActions {
+    gap: 4px;
+  }
+
+  .statusFilterBar {
+    gap: 6px;
+  }
+
+  .statusBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .filterBar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .filterDropdownMobile {
+    width: 100%;
+  }
+
+  .mobileSelect {
+    width: 100%;
+  }
+
+}
+
+@media (max-width: 480px) {
+
+  /* Single column grid on tiny screens */
+  .eventList {
+    grid-template-columns: 1fr;
+  }
+
+  .eventCard {
+    height: 180px;
+  }
+
+  /* Collapse action buttons to icons only */
+  .actionBtn span + * {
+    display: none; /* hide label text, keep icon */
+  }
+
+  .actionBtn {
+    padding: 7px 10px;
+    min-width: 34px;
+    justify-content: center;
+  }
+
+  /* Tighter list item */
+  .eventListItem {
+    padding: 9px 10px;
+    gap: 8px;
+  }
+
+  .listThumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .listTitle {
+    font-size: 12.5px;
+  }
+
+  /* Hide price tag on tiny screens */
+  .listPriceTag {
+    display: none;
+  }
+
+  /* Stack right column */
+  .listRight {
+    align-items: flex-end;
+  }
 }

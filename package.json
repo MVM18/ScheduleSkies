@@ -13,18 +13,30 @@
     "@tomtom-international/web-sdk-maps": "^6.25.0",
     "@tomtom-international/web-sdk-services": "^6.25.0",
     "axios": "^1.6.0",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.38.0",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.14.0",
     "next": "^16.1.6",
     "pdf-parse": "^1.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-icons": "^4.10.1",
-    "react-leaflet": "^4.2.1"
+    "react-icons": "^4.12.0",
+    "react-leaflet": "^4.2.1",
+    "react-timekeeper": "^2.2.1",
+    "supabase": "^2.91.3"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
     "@types/react": "19.2.14",
     "eslint": "^8.53.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^14.0.0",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "react-timekeeper": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   }
 }

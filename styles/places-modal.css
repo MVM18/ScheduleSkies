@@ -1,0 +1,440 @@
+
+/* ─── Modal Overlay ───────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Modal Box ───────────────────────────────────────────────────── */
+.modal-box {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f1b35 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+  overflow-y: auto;
+  position: relative;
+  color: white;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.modal-box::-webkit-scrollbar { width: 4px; }
+.modal-box::-webkit-scrollbar-track { background: transparent; }
+.modal-box::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+/* ─── Close Button ────────────────────────────────────────────────── */
+.modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ─── Photo Gallery ───────────────────────────────────────────────── */
+.modal-gallery {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  overflow: hidden;
+  border-radius: 24px 24px 0 0;
+}
+
+.modal-main-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+.modal-photo-gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: linear-gradient(to top, rgba(15, 27, 53, 1) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* ─── Gallery Arrows ──────────────────────────────────────────────── */
+.modal-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
+}
+
+.modal-arrow:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.modal-arrow-left  { left: 14px; }
+.modal-arrow-right { right: 14px; }
+
+.modal-photo-count {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ─── Thumbnail Strip ─────────────────────────────────────────────── */
+.modal-thumb-strip {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 0 14px;
+  overflow-x: auto;
+}
+
+.modal-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s, outline 0.2s, transform 0.2s;
+  outline: 2px solid transparent;
+  opacity: 0.55;
+}
+
+.modal-thumb.active {
+  outline: 2px solid #fff;
+  opacity: 1;
+}
+
+/* ─── Info Section ────────────────────────────────────────────────── */
+.modal-info {
+  padding: 20px 24px 28px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modal-description {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.modal-place-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+.modal-type-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(99, 179, 237, 0.15);
+  color: #63B3ED;
+  border: 1px solid rgba(99, 179, 237, 0.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.modal-rating-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 72px;
+}
+
+.modal-rating-score {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.modal-rating-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.modal-stars {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.star-filled { color: #FFD700; font-size: 11px; }
+.star-empty  { color: rgba(255, 255, 255, 0.2); font-size: 11px; }
+
+/* ─── Meta Rows (address, hours) ──────────────────────────────────── */
+.modal-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.modal-meta-row .icon-pin   { color: #FF6B6B; flex-shrink: 0; margin-top: 2px; }
+.modal-meta-row .icon-clock { flex-shrink: 0; margin-top: 2px; }
+
+.status-open   { color: #4ADE80; font-weight: 600; }
+.status-closed { color: #F87171; font-weight: 600; }
+
+.modal-hours-detail {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 4px;
+}
+
+/* ─── Reviews ─────────────────────────────────────────────────────── */
+.modal-section-label {
+  margin: 18px 0 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.modal-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-review-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.modal-review-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.modal-review-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.modal-review-author {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.modal-review-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.modal-review-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.modal-directions-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  margin-top: 12px;
+  margin-right: 12px;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  width: fit-content;
+}
+
+.modal-directions-btn:hover {
+  background: #1558b0;
+}
+
+.modal-directions-btn:active {
+  transform: scale(0.97);
+}
+
+/* ─── Light Theme Overrides ───────────────────────────────────────── */
+[data-theme="light"] .modal-box {
+  background: linear-gradient(160deg, #f0f8ff 0%, #e8f4fd 50%, #ddeeff 100%);
+  color: #1a1a2e;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .modal-overlay {
+  background: rgba(100, 100, 100, 0.4);
+}
+
+[data-theme="light"] .modal-close-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-close-btn:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+[data-theme="light"] .modal-photo-gradient {
+  background: linear-gradient(to top, rgba(240, 248, 255, 1) 0%, transparent 100%);
+}
+
+[data-theme="light"] .modal-arrow {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-arrow:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+[data-theme="light"] .modal-photo-count {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-place-title {
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-description {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .modal-rating-badge {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .modal-rating-count {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .modal-meta-row {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme="light"] .modal-hours-detail {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .modal-section-label {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .modal-review-card {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .modal-review-author {
+  color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-review-time {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .modal-review-text {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .modal-review-avatar {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .star-empty {
+  color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .modal-box::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}

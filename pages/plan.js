@@ -7,6 +7,20 @@ import styles from '../styles/event.module.css';
 import Sidebar from '@/components/Sidebar';
 import ShareModal from '@/components/ShareModal';
 import BudgetModal from '@/components/BudgetModal';
+import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import TimeKeeper from 'react-timekeeper';
+import { 
+  addMonths, subMonths, format, startOfMonth, endOfMonth, 
+  startOfWeek, endOfWeek, isSameMonth, addDays, isToday 
+} from 'date-fns';
+import {
+  readPendingItinerary,
+  clearPendingItinerary,
+  buildItineraryEventDraft,
+  buildActivityDraftsFromStructured,
+} from '@/lib/itineraryImportShared';
+import EventGalleryHeader from '@/components/EventGalleryHeader'
 
 const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
@@ -34,9 +48,11 @@ const MyEvents = () => {
   };
 
   const fetchEvents = async () => {
+    setLoading(true);
     const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
     if (data && !error) {
       setEventData(data.map(generateDynamicProps));
+      setLoading(false);
     }
   };
 
@@ -47,16 +63,24 @@ const MyEvents = () => {
   const [userLocation, setUserLocation] = useState('Locating...');
   const [currentDate, setCurrentDate] = useState('');
   const [temperature, setTemperature] = useState('--');
+  const [loading, setLoading] = useState(true);
 
   // Modal & Form States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarDirection, setCalendarDirection] = useState(0); 
   const [isEditListMode, setIsEditListMode] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [locationResults, setLocationResults] = useState([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Clock UI States
+  const [showEventStartClock, setShowEventStartClock] = useState(false);
+  const [showEventEndClock, setShowEventEndClock] = useState(false);
+  const [showActStartClock, setShowActStartClock] = useState(false);
+  const [showActEndClock, setShowActEndClock] = useState(false);
 
   // Itinerary States
   const [isItineraryOpen, setIsItineraryOpen] = useState(false);
@@ -71,10 +95,10 @@ const MyEvents = () => {
   const [activityLocationResults, setActivityLocationResults] = useState([]);
   const [isSearchingActivityLocation, setIsSearchingActivityLocation] = useState(false);
 
-  // Progress bar — completed activities tracked in localStorage
+  // Progress bar
   const [completedActivities, setCompletedActivities] = useState({});
 
-  const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null };
+  const initialFormState = { title: '', location: '', price: '', date: '', category: 'Food', venue: '', start_datetime: '', end_datetime: '', latitude: null, longitude: null, image_link: '' };
   const [formData, setFormData] = useState(initialFormState);
 
   // AI Suggestions State
@@ -82,18 +106,47 @@ const MyEvents = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  // Share / Collaboration State
+  // Share / Budget State
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedEventForShare, setSelectedEventForShare] = useState(null);
-
-  // Budget State
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const [selectedEventForBudget, setSelectedEventForBudget] = useState(null);
+
+  const [pendingImport, setPendingImport] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [importItineraryActive, setImportItineraryActive] = useState(false);
+  const [importActivityActive, setImportActivityActive] = useState(false);
+  const [importActivityIndex, setImportActivityIndex] = useState(0);
 
   const categories = ['All Events', 'Food', 'SightSeeing', 'Hotel', 'Leisure'];
   const formCategories = ['Food', 'SightSeeing', 'Hotel', 'Leisure'];
 
-  // --- STATUS HELPERS ---
+  // --- HELPERS ---
+  const getTimePart = (dt) => {
+    if (!dt || !dt.includes('T')) return '12:00';
+    const timeStr = dt.split('T')[1];
+    const [h, m] = timeStr.split(':');
+    const hh = (h || '12').padStart(2, '0');
+    const mm = (m || '00').substring(0, 2).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const getDatePart = (dt) => {
+    if (!dt) return new Date().toISOString().split('T')[0];
+    return dt.includes('T') ? dt.split('T')[0] : dt;
+  };
+  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+
+  // Helper to display 24h string (14:30) as 12h string (2:30 PM)
+  const formatDisplayTime = (time24) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':');
+    const hours = parseInt(h, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${m} ${ampm}`;
+  };
+
   const getEventStatus = (event) => {
     const now = new Date();
     const endDate = event.end_datetime ? new Date(event.end_datetime) : (event.date ? new Date(event.date + 'T23:59:59') : null);
@@ -109,7 +162,6 @@ const MyEvents = () => {
     Done: eventData.filter(e => getEventStatus(e) === 'done').length,
   };
 
-  // --- PROGRESS BAR HELPERS ---
   const loadCompletedActivities = (eventId) => {
     try {
       const stored = localStorage.getItem(`itinerary_progress_${eventId}`);
@@ -142,7 +194,7 @@ const MyEvents = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.push('/login');
+        router.push('/');
       } else {
         setUserId(session.user.id);
         fetchEvents();
@@ -169,6 +221,29 @@ const MyEvents = () => {
     };
     fetchWeather();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const stored = readPendingItinerary();
+    if (!stored?.structured) {
+      setPendingImport(null);
+      return;
+    }
+    const activityDrafts = buildActivityDraftsFromStructured(stored.structured);
+    const eventDraft = buildItineraryEventDraft(stored.structured, stored.prompt);
+    if (!eventDraft || activityDrafts.length === 0) {
+      clearPendingItinerary();
+      setPendingImport(null);
+      return;
+    }
+    setPendingImport({
+      prompt: stored.prompt,
+      source: stored.source,
+      structured: stored.structured,
+      eventDraft,
+      activityDrafts,
+    });
+  }, [userId]);
 
   // --- AI ANALYSIS ---
   const handleAiAnalysis = async () => {
@@ -232,21 +307,30 @@ const MyEvents = () => {
     if (aiSuggestions.length <= 1) setShowAiPanel(false);
   };
 
+  const handleDismissPendingImport = () => {
+    clearPendingItinerary();
+    setPendingImport(null);
+    setImportError('');
+    setImportItineraryActive(false);
+    setImportActivityActive(false);
+    setImportActivityIndex(0);
+  };
+
   // --- 4. FORM & EVENT LOGIC ---
   const handleOpenAddForm = () => {
-    setFormData(initialFormState);
+    setImportItineraryActive(false);
+    // Initialize date to current date to act as fallback if start/end aren't filled
+    setFormData({ ...initialFormState, date: new Date().toISOString().split('T')[0] });
     setEditingId(null);
     setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
   };
 
-  // Convert a TIMESTAMPTZ ISO string from Supabase to local datetime-local value
   const isoToLocalInput = (isoStr) => {
     if (!isoStr) return '';
     const d = new Date(isoStr);
     if (isNaN(d.getTime())) return '';
-    // Format as YYYY-MM-DDTHH:MM in local time
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -256,11 +340,12 @@ const MyEvents = () => {
   };
 
   const handleOpenEditForm = (event) => {
+    setImportItineraryActive(false);
     setFormData({
       title: event.title,
       location: event.location,
       price: event.price,
-      date: event.date,
+      date: event.date || new Date().toISOString().split('T')[0],
       category: event.category || 'Food',
       venue: event.venue || '',
       start_datetime: isoToLocalInput(event.start_datetime),
@@ -272,6 +357,40 @@ const MyEvents = () => {
     setFormError('');
     setIsFormOpen(true);
     setLocationResults([]);
+  };
+
+  const applyDraftToForm = (draft) => {
+    const locationText = draft.location || '';
+    const derivedVenue = draft.venue || locationText.split(',')[0]?.trim() || '';
+
+    setFormData({
+      title: draft.title || '',
+      location: locationText,
+      price: draft.price != null ? String(draft.price) : '',
+      date: draft.date || new Date().toISOString().split('T')[0],
+      category: draft.category || 'Food',
+      venue: derivedVenue,
+      start_datetime: draft.start_datetime ? isoToLocalInput(draft.start_datetime) : '',
+      end_datetime: draft.end_datetime ? isoToLocalInput(draft.end_datetime) : '',
+      latitude: draft.latitude ?? null,
+      longitude: draft.longitude ?? null,
+    });
+  };
+
+  const handleStartImportItinerary = () => {
+    if (!pendingImport?.eventDraft) return;
+    setImportError('');
+    setImportItineraryActive(true);
+    setEditingId(null);
+    applyDraftToForm(pendingImport.eventDraft);
+    setLocationResults([]);
+    setFormError('');
+    setIsFormOpen(true);
+  };
+
+  const closeEventForm = () => {
+    setIsFormOpen(false);
+    if (importItineraryActive) setImportItineraryActive(false);
   };
 
   const handleDeleteEvent = async (id) => {
@@ -286,7 +405,20 @@ const MyEvents = () => {
     if (!userId) return;
     setFormError('');
 
-    // --- Validation: minimum 5 hours in advance ---
+    // --- NEW: Defensively validate date strings before doing anything ---
+    const isStartInvalid = formData.start_datetime && isNaN(new Date(formData.start_datetime).getTime());
+    const isEndInvalid = formData.end_datetime && isNaN(new Date(formData.end_datetime).getTime());
+
+    if (isStartInvalid) {
+      setFormError('❌ Start date/time is invalid or incomplete. Please re-select the time.');
+      return;
+    }
+    if (isEndInvalid) {
+      setFormError('❌ End date/time is invalid or incomplete. Please re-select the time.');
+      return;
+    }
+    // ------------------------------------------------------------------
+
     if (formData.start_datetime) {
       const startTime = new Date(formData.start_datetime);
       const now = new Date();
@@ -314,14 +446,17 @@ const MyEvents = () => {
       title: formData.title,
       location: formData.location,
       price: formData.price,
-      date: formData.date || (formData.start_datetime ? formData.start_datetime.split('T')[0] : null),
+      // Date acts as a creation/fallback date, invisible to the user in the UI.
+      date: formData.date || (formData.start_datetime ? formData.start_datetime.split('T')[0] : new Date().toISOString().split('T')[0]),
       category: formData.category,
       user_id: userId,
       venue: formData.venue || null,
+      // Safe to convert to ISO because of checks above
       start_datetime: formData.start_datetime ? new Date(formData.start_datetime).toISOString() : null,
       end_datetime: formData.end_datetime ? new Date(formData.end_datetime).toISOString() : null,
       latitude: formData.latitude || null,
-      longitude: formData.longitude || null
+      longitude: formData.longitude || null,
+      image_link: formData.image_link || PLACEHOLDER_IMAGE
     };
 
     if (editingId) {
@@ -332,8 +467,28 @@ const MyEvents = () => {
     } else {
       const { data, error } = await supabase.from('events').insert([newEventData]).select();
       if (data && !error) {
-        setEventData(prev => [...prev, generateDynamicProps(data[0])]);
+        const created = generateDynamicProps(data[0]);
+        setEventData(prev => [...prev, created]);
         setActiveFilter('All Events');
+
+        if (importItineraryActive && pendingImport?.activityDrafts?.length) {
+          await handleOpenItinerary(created);
+          setImportActivityActive(true);
+          setImportActivityIndex(0);
+          setEditingActivityId(null);
+          const first = pendingImport.activityDrafts[0];
+          setActivityForm({
+            activity_name: first.activity_name || '',
+            description: first.description || '',
+            start_time: isoToLocalInput(first.start_time),
+            end_time: isoToLocalInput(first.end_time),
+            location: first.location || '',
+            latitude: first.latitude ?? null,
+            longitude: first.longitude ?? null,
+          });
+          setIsActivityFormOpen(true);
+          setImportItineraryActive(false);
+        }
       }
     }
 
@@ -358,15 +513,22 @@ const MyEvents = () => {
     }
   };
 
-  const handleSelectLocation = (loc) => {
+  const handleSelectLocation = async (loc) => {
     setFormData({
       ...formData,
       location: loc.display_name,
       latitude: parseFloat(loc.lat),
       longitude: parseFloat(loc.lon)
-    });
-    setLocationResults([]);
-  };
+    })
+    setLocationResults([])
+
+    // Fetch place image in background
+    const imageUrl = await fetchPlaceImage(loc.display_name)
+    setFormData(prev => ({
+      ...prev,
+      image_link: imageUrl || PLACEHOLDER_IMAGE
+    }))
+  }
 
   const handleActivityLocationSearch = async (val) => {
     setActivityForm({ ...activityForm, location: val, latitude: null, longitude: null });
@@ -573,7 +735,6 @@ const MyEvents = () => {
     e.preventDefault();
     if (!userId || !selectedEventForItinerary) return;
 
-    // Validation: Check if activity times are within event times
     const eventStart = new Date(selectedEventForItinerary.start_datetime);
     const eventEnd = new Date(selectedEventForItinerary.end_datetime);
     const activityStart = new Date(activityForm.start_time);
@@ -599,7 +760,7 @@ const MyEvents = () => {
       location: activityForm.location || null,
       latitude: activityForm.latitude,
       longitude: activityForm.longitude,
-      sort_order: activities.length
+      sort_order: importActivityActive ? importActivityIndex : activities.length
     };
 
     if (editingActivityId) {
@@ -618,6 +779,29 @@ const MyEvents = () => {
         .select();
       if (data && !error) {
         setActivities(prev => [...prev, data[0]]);
+        if (importActivityActive && pendingImport?.activityDrafts?.length) {
+          const nextIdx = importActivityIndex + 1;
+          if (nextIdx < pendingImport.activityDrafts.length) {
+            const next = pendingImport.activityDrafts[nextIdx];
+            setImportActivityIndex(nextIdx);
+            setEditingActivityId(null);
+            setActivityForm({
+              activity_name: next.activity_name || '',
+              description: next.description || '',
+              start_time: isoToLocalInput(next.start_time),
+              end_time: isoToLocalInput(next.end_time),
+              location: next.location || '',
+              latitude: next.latitude ?? null,
+              longitude: next.longitude ?? null,
+            });
+            setIsActivityFormOpen(true);
+            return;
+          }
+          clearPendingItinerary();
+          setPendingImport(null);
+          setImportActivityActive(false);
+          setImportActivityIndex(0);
+        }
       }
     }
 
@@ -642,11 +826,9 @@ const MyEvents = () => {
     }
   };
 
-  // Multi-waypoint: event venue first, then activity locations
   const handleNavigateItinerary = (event, activitiesList) => {
     const waypoints = [];
 
-    // First waypoint: the event venue itself
     if (event.latitude && event.longitude) {
       waypoints.push({
         lat: parseFloat(event.latitude),
@@ -655,7 +837,6 @@ const MyEvents = () => {
       });
     }
 
-    // Subsequent waypoints: activity locations
     activitiesList.forEach(a => {
       if (a.location && a.location.trim()) {
         if (a.latitude && a.longitude) {
@@ -688,21 +869,36 @@ const MyEvents = () => {
     return matchesCategory && matchesSearch && matchesStatus;
   });
 
-  // --- 7. CALENDAR GENERATION ---
-  const currentYear = calendarDate.getFullYear();
-  const currentMonth = calendarDate.getMonth();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-  const blanks = Array(firstDayOfMonth).fill(null);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  // --- 7. NEW CALENDAR LOGIC (date-fns & framer-motion) ---
+  const handlePrevMonth = () => {
+    setCalendarDirection(-1);
+    setCalendarDate(prev => subMonths(prev, 1));
+  };
 
-  const handlePrevMonth = () => setCalendarDate(new Date(currentYear, currentMonth - 1, 1));
-  const handleNextMonth = () => setCalendarDate(new Date(currentYear, currentMonth + 1, 1));
-  const handleToday = () => setCalendarDate(new Date());
+  const handleNextMonth = () => {
+    setCalendarDirection(1);
+    setCalendarDate(prev => addMonths(prev, 1));
+  };
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const handleToday = () => {
+    setCalendarDirection(0);
+    setCalendarDate(new Date());
+  };
 
-  // --- HELPERS ---
+  const handleMonthDragEnd = (event, info) => {
+    if (info.offset.x < -50) {
+      handleNextMonth();
+    } else if (info.offset.x > 50) {
+      handlePrevMonth();
+    }
+  };
+
+  const calVariants = {
+    enter: (direction) => ({ x: direction > 0 ? 100 : -100, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (direction) => ({ x: direction < 0 ? 100 : -100, opacity: 0 }),
+  };
+
   const formatDateTime = (dtStr) => {
     if (!dtStr) return '';
     const d = new Date(dtStr);
@@ -752,14 +948,8 @@ const MyEvents = () => {
     }
   };
 
-  const handleDragStart = (eventId) => {
-    setDraggedEventId(eventId);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedEventId(null);
-    setDragOverDate(null);
-  };
+  const handleDragStart = (eventId) => setDraggedEventId(eventId);
+  const handleDragEnd = () => { setDraggedEventId(null); setDragOverDate(null); };
 
   const handleDropOnDate = async (dateStr) => {
     if (!draggedEventId) return;
@@ -814,8 +1004,111 @@ const MyEvents = () => {
   };
 
   const calendarConflictEventIds = getCalendarConflictEventIds();
-
   const progressPercent = getProgressPercent();
+
+  const renderCalendarCells = () => {
+    const monthStart = startOfMonth(calendarDate);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const cellDays = [];
+    let day = startDate;
+
+    while (day <= endDate) {
+      const cloneDay = day;
+      const dateStr = format(cloneDay, 'yyyy-MM-dd');
+      const dayEvents = eventData.filter(e => getEventCalendarDate(e) === dateStr);
+      const hasEvent = dayEvents.length > 0;
+      const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
+      const isCurrentMonth = isSameMonth(cloneDay, monthStart);
+      const isCurrentDay = isToday(cloneDay); 
+
+      cellDays.push(
+        <div
+          key={cloneDay.toString()}
+          className={styles.calCell}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
+          onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
+          onDragLeave={() => setDragOverDate(null)}
+          style={{
+            opacity: isCurrentMonth ? 1 : 0.4,
+            backgroundColor: dragOverDate === dateStr 
+              ? 'rgba(118, 181, 217, 0.2)' 
+              : hasConflict 
+                ? 'rgba(248, 113, 113, 0.12)' 
+                : hasEvent 
+                  ? 'rgba(94, 224, 147, 0.1)' 
+                  : '#1a1a1a',
+            border: dragOverDate === dateStr 
+              ? '2px dashed #76b5d9' 
+              : hasConflict 
+                ? '1px solid #EF4444' 
+                : hasEvent 
+                  ? '1px solid #5EE093' 
+                  : 'none'
+          }}
+        >
+          <span 
+            className={styles.calDayNum} 
+            style={isCurrentDay ? {
+              backgroundColor: '#10B981', 
+              color: 'white',
+              borderRadius: '50%',
+              width: '24px',
+              height: '24px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              margin: '0 auto 6px auto'
+            } : hasEvent ? { fontWeight: 'bold', color: '#76b5d9' } : {}}
+          >
+            {format(cloneDay, 'd')}
+          </span>
+          <div className={styles.calEventsContainer}>
+            {dayEvents.map(ev => {
+              const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
+              const isConflict = calendarConflictEventIds.has(ev.id);
+              return (
+                <div
+                  key={ev.id}
+                  className={styles.calEventPill}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
+                    color: isConflict ? '#fff' : '#111',
+                    border: isConflict ? '1px solid #DC2626' : undefined,
+                    cursor: 'grab'
+                  }}
+                  title={`Drag to move event to another day`}
+                >
+                  {eventTime} · {ev.title}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+      day = addDays(day, 1);
+    }
+    return cellDays;
+  };
+
+  const fetchPlaceImage = async (locationName) => {
+    try {
+      const res = await fetch(`/api/place-image?query=${encodeURIComponent(locationName)}`)
+      const data = await res.json()
+      return data.url || null
+    } catch (err) {
+      console.error('Place image fetch failed:', err)
+      return null
+    }
+  }
+
+  const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop'
 
   return (
     <div className={styles.appContainer}>
@@ -853,6 +1146,88 @@ const MyEvents = () => {
           </div>
         </header>
 
+        {pendingImport ? (
+          <section
+            style={{
+              marginBottom: '14px',
+              padding: '14px 16px',
+              borderRadius: '14px',
+              border: '1px solid rgba(37, 99, 235, 0.25)',
+              background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.98))',
+              boxShadow: '0 8px 24px rgba(37, 99, 235, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 6px', fontSize: '15px', color: '#1e3a8a', fontWeight: 700 }}>
+                  Itinerary from home demo
+                </h2>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#475569', lineHeight: 1.55, maxWidth: '62ch' }}>
+                  {pendingImport.prompt ? (
+                    <>
+                      <strong>Prompt:</strong> {pendingImport.prompt}
+                      <br />
+                    </>
+                  ) : null}
+                  {pendingImport.structured?.summary ? (
+                    <>
+                      <strong>Summary:</strong> {pendingImport.structured.summary}
+                      <br />
+                    </>
+                  ) : null}
+                  Create <strong>one event</strong> for this itinerary, then add <strong>{pendingImport.activityDrafts.length}</strong> places
+                  as activities inside that event.
+                </p>
+                {importError ? (
+                  <p style={{ margin: '8px 0 0', fontSize: '12.5px', color: '#b91c1c', fontWeight: 600 }}>{importError}</p>
+                ) : null}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleStartImportItinerary}
+                  style={{
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    background: '#2563eb',
+                    color: '#fff',
+                  }}
+                >
+                  Create itinerary event
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissPendingImport}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    background: '#fff',
+                    color: '#334155',
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            <ul style={{ margin: '12px 0 0', paddingLeft: '18px', fontSize: '12px', color: '#334155', lineHeight: 1.5 }}>
+              {pendingImport.activityDrafts.slice(0, 6).map((a, i) => (
+                <li key={`${a.activity_name}-${i}`}>
+                  {new Date(a.start_time).toLocaleString()} — {a.activity_name} @ {a.location}
+                </li>
+              ))}
+              {pendingImport.activityDrafts.length > 6 ? <li>…and {pendingImport.activityDrafts.length - 6} more</li> : null}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Status Filter Tabs */}
         <div className={styles.statusFilterBar}>
           {['All', 'Upcoming', 'Done'].map(status => (
@@ -869,20 +1244,7 @@ const MyEvents = () => {
 
         {/* Filter Bar */}
         <div className={styles.filterBar}>
-          {/* Desktop: category buttons */}
-          <div className={styles.filterBtnsDesktop}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                className={`${styles.filterBtn} ${activeFilter === cat ? styles.activeFilter : ''}`}
-                onClick={() => setActiveFilter(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile: category dropdown */}
+          {/* Category dropdown */}
           <div className={styles.filterDropdownMobile}>
             <select
               className={styles.mobileSelect}
@@ -917,6 +1279,30 @@ const MyEvents = () => {
             >
               <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
             </button>
+
+            {/* View toggle */}
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'grid' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </button>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List view"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10.5" width="18" height="3" rx="1"/>
+                  <rect x="3" y="17" width="18" height="3" rx="1"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -963,121 +1349,136 @@ const MyEvents = () => {
         )}
 
         {/* Event List */}
-        <section className={styles.eventList}>
-          {filteredEvents.length === 0 ? (
-            <div className={styles.emptyState}>
-              {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+        {loading ? (
+            <div className="spinner-container">
+              <div className="loading-spinner"></div>
             </div>
           ) : (
-            filteredEvents.map(event => {
-              const status = getEventStatus(event);
-              return (
-                <div key={event.id} className={styles.eventCard} style={{ position: 'relative' }}>
-                  <div className={styles.cardLeftBorder} style={{ backgroundColor: event.typeColor }}></div>
-
-                  {/* Status Badge */}
-                  <span
-                    className={styles.cardStatusBadge}
-                    style={{
-                      background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                      color: status === 'done' ? '#15A862' : '#4396D1'
+            <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
+              {filteredEvents.length === 0 ? (
+                <div className={styles.emptyState}>
+                  {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+                </div>
+              ) : viewMode === 'grid' ? (
+                // ── GRID VIEW (existing) ──────────────────────────────────────────────
+                filteredEvents.map(event => {
+                  const status = getEventStatus(event)
+                  return (
+                    <div key={event.id} className={styles.eventCard} style={{
+                      position: 'relative',
+                      backgroundImage: `url(${event.image_link})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
                     }}
-                  >
-                    {status === 'done' ? '✅ Done' : '🔜 Upcoming'}
-                  </span>
-
-                  <div className={styles.cardBody}>
-                    <div className={styles.eventInfo}>
-                      <div className={styles.avatar}>
-                        {event.title.substring(0, 2).toUpperCase()}
+                    onClick={() => handleOpenItinerary(event)}>
+                      <span>
+                        <div className={styles.titleContainer}>
+                          <p>{event.title}</p>
+                        </div>
+                      </span>
+                      <span
+                        className={styles.cardStatusBadge}
+                        style={{
+                          background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                          color: status === 'done' ? '#15A862' : '#4396D1',
+                          border: '0.5px solid black'
+                        }}
+                      >
+                        {status === 'done' ? 'Done' : 'Upcoming'}
+                      </span>
+                      {isEditListMode && (
+                        <div className={styles.cardActions}>
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                // ── LIST VIEW ─────────────────────────────────────────────────────────
+                filteredEvents.map(event => {
+                  const status = getEventStatus(event)
+                  const range = event.start_datetime ? formatDateRange(event.start_datetime, event.end_datetime) : null
+                  return (
+                    <div
+                      key={event.id}
+                      className={styles.eventListItem}
+                      onClick={() => handleOpenItinerary(event)}
+                    >
+                      {/* Thumbnail */}
+                      <div className={styles.listThumb}>
+                        {event.image_link
+                          ? <img src={event.image_link} alt={event.title} />
+                          : <div className={styles.listThumbPlaceholder}>{event.category[0]}</div>
+                        }
                       </div>
-                      <div className={styles.details}>
-                        <h3>{event.title}</h3>
-                        <p>{event.location} • {event.price}</p>
 
-                        {/* Enhanced meta info */}
-                        <div className={styles.eventMeta}>
+                      {/* Main info */}
+                      <div className={styles.listInfo}>
+                        <div className={styles.listTitle}>{event.title}</div>
+                        <div className={styles.listMeta}>
                           {event.venue && <span>🏛️ {event.venue}</span>}
-                          {event.start_datetime ? (
-                            <span>📅 {formatDateTime(event.start_datetime)}</span>
-                          ) : event.date ? (
-                            <span>📅 {event.date}</span>
-                          ) : null}
-                          {event.end_datetime && <span>→ {formatTime(event.end_datetime)}</span>}
-                        </div>
-
-                        <div className={styles.tagRow}>
-                          {event.tags.map((tag, index) => (
-                            <span key={index} className={`${styles.tag} ${tag.styleClass}`}>
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-
-                        {event.aiSuggestion && (
-                          <div className={styles.tagRow}>
-                            <div className={styles.aiBox}>{event.aiSuggestion}</div>
-                          </div>
-                        )}
-
-                        {/* Itinerary, Share, Budget & Navigate Buttons */}
-                        <div className={styles.cardBtnRow}>
-                          <button
-                            className={styles.itineraryBtn}
-                            onClick={() => handleOpenItinerary(event)}
-                          >
-                            📋 Itinerary
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #4A90D9, #6D7DB9)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForShare(event); setIsShareModalOpen(true); }}
-                          >
-                            🔗 Share
-                          </button>
-                          <button
-                            className={styles.itineraryBtn}
-                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', border: 'none' }}
-                            onClick={() => { setSelectedEventForBudget(event); setIsBudgetOpen(true); }}
-                          >
-                            💰 Budget
-                          </button>
-                          {(event.latitude && event.longitude) ? (
-                            <button
-                              className={styles.navigateBtn}
-                              onClick={() => handleNavigateToVenue(event)}
-                            >
-                              🧭 Navigate
-                            </button>
-                          ) : (
-                            <span className={styles.locationHint}>📍 Select location from search to enable navigation</span>
+                          <span>📍 {event.location}</span>
+                          {range && (
+                            <span>📅 {range.dateStr} · {range.startTime}{range.endTime ? ` – ${range.endTime}` : ''}</span>
                           )}
                         </div>
+                        <div className={styles.listTags}>
+                          <span
+                            className={styles.listCategoryTag}
+                            style={{ background: event.typeColor + '22', color: event.typeColor, border: `1px solid ${event.typeColor}44` }}
+                          >
+                            {event.category}
+                          </span>
+                          {event.price && <span className={styles.listPriceTag}>💰 {event.price}</span>}
+                        </div>
+                      </div>
+
+                      {/* Status + actions */}
+                      <div className={styles.listRight}>
+                        <span
+                          className={styles.cardStatusBadge}
+                          style={{
+                            background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                            color: status === 'done' ? '#15A862' : '#4396D1',
+                            border: '0.5px solid black',
+                            position: 'static',
+                            marginBottom: isEditListMode ? '8px' : '0'
+                          }}
+                        >
+                          {status === 'done' ? 'Done' : 'Upcoming'}
+                        </span>
+                        {isEditListMode && (
+                          <div className={styles.listActions}>
+                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Conditionally Render Edit/Delete Actions */}
-                  {isEditListMode && (
-                    <div className={styles.cardActions}>
-                      <button onClick={() => handleOpenEditForm(event)} className={styles.iconBtnEdit}>✎</button>
-                      <button onClick={() => handleDeleteEvent(event.id)} className={styles.iconBtnDelete}>🗑</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </section>
+                  )
+                })
+              )}
+            </section>
+          )
+        }
       </main>
 
       {/* --- ADD / EDIT EVENT MODAL --- */}
       {isFormOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsFormOpen(false)}>
+        <div className={styles.modalOverlay} onClick={closeEventForm}>
           <div className={styles.formModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.formHeader}>
-              <h2>{editingId ? 'Edit Event' : 'Create New Event'}</h2>
-              <button className={styles.closeBtnLight} onClick={() => setIsFormOpen(false)}>✕</button>
+              <h2>
+                {editingId
+                  ? 'Edit Event'
+                  : importItineraryActive && pendingImport?.activityDrafts?.length
+                    ? `Create itinerary event (then ${pendingImport.activityDrafts.length} activities)`
+                    : 'Create New Event'}
+              </h2>
+              <button type="button" className={styles.closeBtnLight} onClick={closeEventForm}>✕</button>
             </div>
 
             <form onSubmit={handleSaveEvent} className={styles.eventForm}>
@@ -1127,28 +1528,142 @@ const MyEvents = () => {
                     🗺️ Pick on map
                   </button>
                 </div>
+
                 <div className={styles.formGroup}>
                   <label>Price / Cost</label>
                   <input required type="text" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder="e.g. ₱350/Person" />
                 </div>
               </div>
 
+              {formData.image_link && (
+                  <div style={{
+                    marginTop: '8px',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    height: '120px',
+                    width: '100%',
+                    position: 'relative',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <img
+                      src={formData.image_link}
+                      alt="Location preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0, left: 0, right: 0,
+                      padding: '6px 10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      fontSize: '10px',
+                      color: '#fff',
+                      fontWeight: 500
+                    }}>
+                      {formData.image_link.includes('unsplash') ? '🖼️ Placeholder image' : '📍 Location photo from Google'}
+                    </div>
+                  </div>
+                )}
+
+              {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI */}
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>Start Date & Time</label>
-                  <input type="datetime-local" value={formData.start_datetime} onChange={e => setFormData({ ...formData, start_datetime: e.target.value, date: e.target.value ? e.target.value.split('T')[0] : formData.date })} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input 
+                      type="date" 
+                      style={{ flex: 1.5 }}
+                      value={getDatePart(formData.start_datetime)} 
+                      onChange={e => {
+                        const timePart = getTimePart(formData.start_datetime);
+                        const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
+                        setFormData({ ...formData, start_datetime: newVal, date: e.target.value || formData.date });
+                      }} 
+                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input 
+                        type="text" 
+                        readOnly
+                        style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                        value={formatDisplayTime(getTimePart(formData.start_datetime))} 
+                        onClick={() => setShowEventStartClock(true)}
+                        placeholder="Time"
+                      />
+                      <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                      
+                      {/* React Timekeeper Popup */}
+                      {showEventStartClock && (
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventStartClock(false)} />
+                          <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                            <TimeKeeper 
+                              time={getTimePart(formData.start_datetime)}
+                              onChange={(data) => {
+                                const datePart = getDatePart(formData.start_datetime);
+                                const hh = String(data.hour).padStart(2, '0');
+                                const mm = String(data.minute).padStart(2, '0');
+                                setFormData({ ...formData, start_datetime: `${datePart}T${hh}:${mm}` });
+                              }}
+                              onDoneClick={() => setShowEventStartClock(false)}
+                              switchToMinuteOnHourSelect
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </div>
+              
+              <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>End Date & Time</label>
-                  <input type="datetime-local" value={formData.end_datetime} onChange={e => setFormData({ ...formData, end_datetime: e.target.value })} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input 
+                      type="date" 
+                      style={{ flex: 1.5 }}
+                      value={getDatePart(formData.end_datetime)} 
+                      onChange={e => {
+                        const timePart = getTimePart(formData.end_datetime);
+                        const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
+                        setFormData({ ...formData, end_datetime: newVal });
+                      }} 
+                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input 
+                        type="text" 
+                        readOnly
+                        style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                        value={formatDisplayTime(getTimePart(formData.end_datetime))} 
+                        onClick={() => setShowEventEndClock(true)}
+                        placeholder="Time"
+                      />
+                      <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                      
+                      {/* React Timekeeper Popup */}
+                      {showEventEndClock && (
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventEndClock(false)} />
+                          <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                            <TimeKeeper 
+                              time={getTimePart(formData.end_datetime)}
+                              onChange={(data) => {
+                                const datePart = getDatePart(formData.end_datetime) || getDatePart(formData.start_datetime);
+                                const hh = String(data.hour).padStart(2, '0');
+                                const mm = String(data.minute).padStart(2, '0');
+                                setFormData({ ...formData, end_datetime: `${datePart}T${hh}:${mm}` });
+                              }}
+                              onDoneClick={() => setShowEventEndClock(false)}
+                              switchToMinuteOnHourSelect
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label>Date (fallback)</label>
-                  <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
-                </div>
                 <div className={styles.formGroup}>
                   <label>Category</label>
                   <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
@@ -1177,8 +1692,14 @@ const MyEvents = () => {
               )}
 
               <div className={styles.formFooter}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsFormOpen(false)}>Cancel</button>
-                <button type="submit" className={styles.btnSave}>{editingId ? 'Save Changes' : 'Create Event'}</button>
+                <button type="button" className={styles.btnCancel} onClick={closeEventForm}>Cancel</button>
+                <button type="submit" className={styles.btnSave}>
+                  {editingId
+                    ? 'Save Changes'
+                    : importItineraryActive && pendingImport?.activityDrafts?.length
+                      ? 'Create itinerary & start activities'
+                      : 'Create Event'}
+                </button>
               </div>
             </form>
           </div>
@@ -1189,8 +1710,19 @@ const MyEvents = () => {
       {isItineraryOpen && selectedEventForItinerary && (
         <div className={styles.modalOverlay} onClick={() => setIsItineraryOpen(false)}>
           <div className={styles.itineraryModal} onClick={(e) => e.stopPropagation()}>
-            {/* Gradient Header */}
-            <div className={styles.itineraryHeader}>
+            
+            {/* Gallery Header */}
+            <EventGalleryHeader
+              event={selectedEventForItinerary}
+              userId={userId}
+              onClose={() => setIsItineraryOpen(false)}
+              onCoverChange={(newUrl) => {
+                setSelectedEventForItinerary(prev => ({ ...prev, image_link: newUrl }))
+              }}
+            />
+
+            {/* Body — Progress Bar + Timeline */}
+            <div className={styles.itineraryBody}>
               <div className={styles.itineraryHeaderContent}>
                 <div className={styles.itineraryHeaderTop}>
                   <div>
@@ -1198,8 +1730,8 @@ const MyEvents = () => {
                       Event Itinerary
                     </div>
                     <h2>{selectedEventForItinerary.title}</h2>
+                    <span className={styles.activityCount}>{activities.length} ACTIVIT{activities.length === 1 ? 'Y' : 'IES'}</span>
                   </div>
-                  <button className={styles.itineraryCloseBtn} onClick={() => setIsItineraryOpen(false)}>✕</button>
                 </div>
 
                 <div className={styles.venueInfoBar}>
@@ -1212,27 +1744,7 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
-                  {selectedEventForItinerary.start_datetime && (() => {
-                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
-                    return (
-                      <>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>📅</span>
-                          <div>
-                            <span className={styles.infoLabel}>Date</span>
-                            <span className={styles.infoValue}>{range.dateStr}</span>
-                          </div>
-                        </div>
-                        <div className={styles.venueInfoItem}>
-                          <span className={styles.infoIcon}>🕐</span>
-                          <div>
-                            <span className={styles.infoLabel}>Time</span>
-                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` — ${range.endTime}` : ''}</span>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
+
                   {selectedEventForItinerary.location && (
                     <div
                       className={styles.venueInfoItem}
@@ -1253,12 +1765,24 @@ const MyEvents = () => {
                       </div>
                     </div>
                   )}
+
+                  {selectedEventForItinerary.start_datetime && (() => {
+                    const range = formatDateRange(selectedEventForItinerary.start_datetime, selectedEventForItinerary.end_datetime);
+                    return (
+                      <>
+                        <div className={styles.venueInfoItem}>
+                          <span className={styles.infoIcon}>📅</span>
+                          <div>
+                            <span className={styles.infoLabel}>Date & Time</span>
+                            <span className={styles.infoValue}>{range.dateStr}</span>
+                            <span className={styles.infoValue}>{range.startTime}{range.endTime ? ` - ${range.endTime}` : ''}</span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
-
-            {/* Body — Progress Bar + Timeline */}
-            <div className={styles.itineraryBody}>
 
               {/* Progress Bar */}
               {activities.length > 0 && (
@@ -1345,14 +1869,108 @@ const MyEvents = () => {
                         <label>Activity Name *</label>
                         <input required type="text" value={activityForm.activity_name} onChange={e => setActivityForm({ ...activityForm, activity_name: e.target.value })} placeholder="e.g. Opening Speech" />
                       </div>
+                      
+                      {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI ON ACTIVITIES */}
                       <div>
-                        <label>Start Time *</label>
-                        <input required type="datetime-local" value={activityForm.start_time} onChange={e => setActivityForm({ ...activityForm, start_time: e.target.value })} min={isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
+                        <label>Start *</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            required 
+                            type="date" 
+                            style={{ flex: 1.5 }}
+                            value={getDatePart(activityForm.start_time)} 
+                            onChange={e => {
+                              const timePart = getTimePart(activityForm.start_time);
+                              setActivityForm({ ...activityForm, start_time: `${e.target.value}T${timePart}` });
+                            }} 
+                            min={selectedEventForItinerary?.start_datetime?.split('T')[0]} 
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                          />
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <input 
+                              required 
+                              type="text" 
+                              readOnly
+                              style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                              value={formatDisplayTime(getTimePart(activityForm.start_time))} 
+                              onClick={() => setShowActStartClock(true)}
+                              placeholder="Time"
+                            />
+                            <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            
+                            {/* React Timekeeper Popup */}
+                            {showActStartClock && (
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActStartClock(false)} />
+                                <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                  <TimeKeeper 
+                                    time={getTimePart(activityForm.start_time)}
+                                    onChange={(data) => {
+                                      const datePart = getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]);
+                                      const hh = String(data.hour).padStart(2, '0');
+                                      const mm = String(data.minute).padStart(2, '0');
+                                      setActivityForm({ ...activityForm, start_time: `${datePart}T${hh}:${mm}` });
+                                    }}
+                                    onDoneClick={() => setShowActStartClock(false)}
+                                    switchToMinuteOnHourSelect
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+
                       <div>
-                        <label>End Time *</label>
-                        <input required type="datetime-local" value={activityForm.end_time} onChange={e => setActivityForm({ ...activityForm, end_time: e.target.value })} min={activityForm.start_time || isoToLocalInput(selectedEventForItinerary.start_datetime)} max={isoToLocalInput(selectedEventForItinerary.end_datetime)} />
+                        <label>End *</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input 
+                            required 
+                            type="date" 
+                            style={{ flex: 1.5 }}
+                            value={getDatePart(activityForm.end_time)} 
+                            onChange={e => {
+                              const timePart = getTimePart(activityForm.end_time);
+                              setActivityForm({ ...activityForm, end_time: `${e.target.value}T${timePart}` });
+                            }} 
+                            min={getDatePart(activityForm.start_time) || selectedEventForItinerary?.start_datetime?.split('T')[0]} 
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                          />
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <input 
+                              required 
+                              type="text" 
+                              readOnly
+                              style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                              value={formatDisplayTime(getTimePart(activityForm.end_time))} 
+                              onClick={() => setShowActEndClock(true)}
+                              placeholder="Time"
+                            />
+                            <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            
+                            {/* React Timekeeper Popup */}
+                            {showActEndClock && (
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActEndClock(false)} />
+                                <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                  <TimeKeeper 
+                                    time={getTimePart(activityForm.end_time)}
+                                    onChange={(data) => {
+                                      const datePart = getDatePart(activityForm.end_time) || (getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]));
+                                      const hh = String(data.hour).padStart(2, '0');
+                                      const mm = String(data.minute).padStart(2, '0');
+                                      setActivityForm({ ...activityForm, end_time: `${datePart}T${hh}:${mm}` });
+                                    }}
+                                    onDoneClick={() => setShowActEndClock(false)}
+                                    switchToMinuteOnHourSelect
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+
                       <div className={styles.fullWidth}>
                         <label>Description</label>
                         <textarea value={activityForm.description} onChange={e => setActivityForm({ ...activityForm, description: e.target.value })} placeholder="Brief description of the activity..." />
@@ -1408,7 +2026,6 @@ const MyEvents = () => {
 
             {/* Footer */}
             <div className={styles.itineraryFooter}>
-              <span className={styles.activityCount}>{activities.length} activit{activities.length === 1 ? 'y' : 'ies'}</span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   className={styles.navigateBtnLg}
@@ -1448,76 +2065,60 @@ const MyEvents = () => {
       {isCalendarOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsCalendarOpen(false)}>
           <div className={styles.calendarModal} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header */}
             <div className={styles.calHeader}>
               <div className={styles.calHeaderLeft}>
                 <button className={styles.calTodayBtn} onClick={handleToday}>Today</button>
-                <div className={styles.calArrows}>
-                  <span onClick={handlePrevMonth} style={{ cursor: 'pointer', userSelect: 'none' }}>&lt;</span>
-                  <span onClick={handleNextMonth} style={{ cursor: 'pointer', userSelect: 'none' }}>&gt;</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    onClick={handlePrevMonth} 
+                    onDragEnter={(e) => { e.preventDefault(); handlePrevMonth(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    <ChevronLeft size={16} /> Prev
+                  </button>
+                  <button 
+                    onClick={handleNextMonth} 
+                    onDragEnter={(e) => { e.preventDefault(); handleNextMonth(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    Next <ChevronRight size={16} />
+                  </button>
                 </div>
-                <h2>{monthNames[currentMonth]} {currentYear}</h2>
+                <h2>{format(calendarDate, "MMMM yyyy")}</h2>
               </div>
               <div className={styles.calHeaderRight}>
                 <button className={styles.calCloseBtn} onClick={() => setIsCalendarOpen(false)}>✕</button>
               </div>
             </div>
+
+            {/* Weekdays */}
             <div className={styles.calWeekdays}>
               {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => <div key={day}>{day}</div>)}
             </div>
-            <div className={styles.calGrid}>
-              {blanks.map((_, i) => <div key={`blank-${i}`} className={styles.calCellEmpty}></div>)}
-              {days.map(day => {
-                const monthStr = String(currentMonth + 1).padStart(2, '0');
-                const dayStr = String(day).padStart(2, '0');
-                const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
-                const dayEvents = eventData.filter(e => e.date === dateStr);
-                const hasEvent = dayEvents.length > 0;
-                const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
-                return (
-                  <div
-                    key={day}
-                    className={styles.calCell}
-                    onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
-                    onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
-                    onDragLeave={() => setDragOverDate(null)}
-                    style={
-                      dragOverDate === dateStr
-                        ? { backgroundColor: 'rgba(118, 181, 217, 0.2)', border: '2px dashed #76b5d9' }
-                        : hasConflict
-                          ? { backgroundColor: 'rgba(248, 113, 113, 0.12)', border: '1px solid #EF4444' }
-                          : hasEvent
-                            ? { backgroundColor: 'rgba(94, 224, 147, 0.1)', border: '1px solid #5EE093' }
-                            : {}
-                    }
-                  >
-                    <span className={styles.calDayNum} style={hasEvent ? { fontWeight: 'bold', color: '#2C3E50' } : {}}>{day}</span>
-                    <div className={styles.calEventsContainer}>
-                      {dayEvents.map(ev => {
-                        const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
-                        const isConflict = calendarConflictEventIds.has(ev.id);
-                        return (
-                          <div
-                            key={ev.id}
-                            className={styles.calEventPill}
-                            draggable
-                            onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
-                            onDragEnd={handleDragEnd}
-                            style={{
-                              backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
-                              color: isConflict ? '#fff' : '#111',
-                              border: isConflict ? '1px solid #DC2626' : undefined,
-                              cursor: 'grab'
-                            }}
-                            title={`Drag to move event to another day`}
-                          >
-                            {eventTime} · {ev.title}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+
+            {/* Calendar Grid with Framer Motion Drag/Swipe */}
+            <div style={{ overflow: 'hidden', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <AnimatePresence initial={false} custom={calendarDirection} mode="popLayout">
+                <motion.div
+                  key={calendarDate.toString()}
+                  custom={calendarDirection}
+                  variants={calVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={1} 
+                  onDragEnd={handleMonthDragEnd}
+                  className={styles.calGrid}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', touchAction: 'pan-y' }}
+                >
+                  {renderCalendarCells()}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/')
   }
 
   return (
@@ -35,8 +35,8 @@ export default function Sidebar() {
       <nav className={styles.nav}>
         <ul>
           <li>
-            <Link href="/">
-              <div className={`btn ${router.pathname === '/' ? styles.active : ''}`}>
+            <Link href="/dashboard">
+              <div className={`btn ${router.pathname === '/dashboard' ? styles.active : ''}`}>
                 <HomeIcon className={styles.icon} fill="currentColor" />
               </div>
             </Link>
