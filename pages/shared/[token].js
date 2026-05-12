@@ -25,7 +25,7 @@ const formatDateRange = (start, end) => {
 };
 
 const initialActivityForm = { activity_name: '', description: '', start_time: '', end_time: '', location: '' };
-const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
+const MAP_PICK_SHARED_ACTIVITY_KEY = 'scheduleSkies_mapPick_shared-activity';
 const SHARED_RESTORE_STORAGE_KEY = 'scheduleSkies_sharedRestore';
 
 export default function SharedEventPage() {
@@ -85,8 +85,9 @@ export default function SharedEventPage() {
   useEffect(() => {
     if (typeof window === 'undefined' || !token) return;
     const restoreRaw = sessionStorage.getItem(SHARED_RESTORE_STORAGE_KEY);
-    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
-    if (!restoreRaw && !pickRaw) return;
+    const pickNewRaw = sessionStorage.getItem(MAP_PICK_SHARED_ACTIVITY_KEY);
+    const pickLegacyRaw = sessionStorage.getItem('scheduleSkies_mapPick');
+    if (!restoreRaw && !pickNewRaw && !pickLegacyRaw) return;
 
     if (restoreRaw) {
       try {
@@ -102,14 +103,18 @@ export default function SharedEventPage() {
       }
     }
 
-    if (pickRaw) {
+    const consumePick = (raw, storageKey) => {
+      if (!raw) return;
       try {
-        const pick = JSON.parse(pickRaw);
+        const pick = JSON.parse(raw);
         if (Date.now() - pick.ts > 10 * 60 * 1000) {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          sessionStorage.removeItem(storageKey);
           return;
         }
-        if (pick.context === 'activity') {
+        const ok =
+          pick.context === 'shared-activity' ||
+          (storageKey === 'scheduleSkies_mapPick' && pick.context === 'activity');
+        if (ok) {
           setActivityForm(prev => ({
             ...prev,
             location: pick.label || prev.location,
@@ -117,12 +122,15 @@ export default function SharedEventPage() {
             longitude: pick.lng,
           }));
           setIsActivityFormOpen(true);
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+          sessionStorage.removeItem(storageKey);
         }
       } catch {
-        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+        sessionStorage.removeItem(storageKey);
       }
-    }
+    };
+
+    consumePick(pickNewRaw, MAP_PICK_SHARED_ACTIVITY_KEY);
+    consumePick(pickLegacyRaw, 'scheduleSkies_mapPick');
   }, [token]);
 
   // Real-time subscription
@@ -272,7 +280,7 @@ export default function SharedEventPage() {
       console.error(e);
     }
 
-    const params = new URLSearchParams({ pick: '1', from: 'activity', returnTo: `/shared/${token}` });
+    const params = new URLSearchParams({ pick: '1', from: 'shared-activity', returnTo: `/shared/${token}` });
     if (activityForm.latitude != null && activityForm.longitude != null) {
       params.set('lat', String(activityForm.latitude));
       params.set('lng', String(activityForm.longitude));
