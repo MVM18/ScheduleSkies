@@ -22,7 +22,9 @@ import {
 } from '@/lib/itineraryImportShared';
 import EventGalleryHeader from '@/components/EventGalleryHeader'
 
-const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
+const MAP_PICK_KEY_EVENT = 'scheduleSkies_mapPick_event';
+const MAP_PICK_KEY_ACTIVITY = 'scheduleSkies_mapPick_activity';
+const MAP_PICK_LEGACY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
 
 const MyEvents = () => {
@@ -188,6 +190,8 @@ const MyEvents = () => {
     return dt.includes('T') ? dt.split('T')[0] : dt;
   };
   const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+  /** 'all' | 'mine' | 'shared' — filter list by ownership */
+  const [ownershipFilter, setOwnershipFilter] = useState('all');
 
   // Helper to display 24h string (14:30) as 12h string (2:30 PM)
   const formatDisplayTime = (time24) => {
@@ -213,6 +217,9 @@ const MyEvents = () => {
     Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
     Done: eventData.filter(e => getEventStatus(e) === 'done').length,
   };
+
+  const sharedWithMeCount = eventData.filter(e => e.isShared).length;
+  const myEventsCount = eventData.filter(e => !e.isShared).length;
 
   const loadCompletedActivities = (eventId) => {
     try {
@@ -514,12 +521,14 @@ const MyEvents = () => {
     if (editingId) {
       const { data, error } = await supabase.from('events').update(newEventData).eq('id', editingId).select();
       if (data && !error) {
-        setEventData(prev => prev.map(ev => ev.id === editingId ? generateDynamicProps(data[0]) : ev));
+        setEventData(prev => prev.map(ev =>
+          ev.id === editingId ? { ...generateDynamicProps(data[0]), isShared: ev.isShared } : ev
+        ));
       }
     } else {
       const { data, error } = await supabase.from('events').insert([newEventData]).select();
       if (data && !error) {
-        const created = generateDynamicProps(data[0]);
+        const created = { ...generateDynamicProps(data[0]), isShared: false };
         setEventData(prev => [...prev, created]);
         setActiveFilter('All Events');
 
@@ -664,10 +673,7 @@ const MyEvents = () => {
     } catch (e) {
       console.error(e);
     }
-    // Determine if this event is shared and set appropriate context
-    const isShared = selectedEventForItinerary.isShared === true;
-    const contextType = isShared ? 'shared-activity' : 'activity';
-    const params = new URLSearchParams({ pick: '1', from: contextType, returnTo: '/plan' });
+    const params = new URLSearchParams({ pick: '1', from: 'activity', returnTo: '/plan' });
     if (activityForm.latitude != null && activityForm.longitude != null) {
       params.set('lat', String(activityForm.latitude));
       params.set('lng', String(activityForm.longitude));
@@ -678,10 +684,25 @@ const MyEvents = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !userId) return;
-    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
-    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
-    if (!restoreRaw && !pickRaw) return;
 
+    const consumeTimedMapPick = (storageKey) => {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return null;
+      try {
+        const mapPick = JSON.parse(raw);
+        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
+          sessionStorage.removeItem(storageKey);
+          return null;
+        }
+        sessionStorage.removeItem(storageKey);
+        return mapPick;
+      } catch {
+        sessionStorage.removeItem(storageKey);
+        return null;
+      }
+    };
+
+    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
     if (restoreRaw) {
       try {
         const restore = JSON.parse(restoreRaw);
@@ -690,44 +711,7 @@ const MyEvents = () => {
           setFormData(restore.formDataSnapshot);
           setEditingId(restore.editingId ?? null);
           setIsFormOpen(true);
-        }
-      } catch {
-        sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
-      }
-    }
-
-    if (pickRaw) {
-      try {
-        const mapPick = JSON.parse(pickRaw);
-        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          return;
-        }
-        if (mapPick.context !== 'activity') {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          setFormData(prev => ({
-            ...prev,
-            location: mapPick.label || prev.location,
-            latitude: mapPick.lat,
-            longitude: mapPick.lng,
-          }));
-        }
-      } catch {
-        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-      }
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !userId || eventData.length === 0) return;
-    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
-    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
-    if (!restoreRaw && !pickRaw) return;
-
-    if (restoreRaw) {
-      try {
-        const restore = JSON.parse(restoreRaw);
-        if (restore.type === 'activity' && restore.itineraryEventId) {
+        } else if (restore.type === 'activity' && restore.itineraryEventId && eventData.length > 0) {
           const ev = eventData.find(e => e.id === restore.itineraryEventId);
           if (ev) {
             sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
@@ -744,24 +728,42 @@ const MyEvents = () => {
       }
     }
 
-    if (pickRaw) {
-      try {
-        const mapPick = JSON.parse(pickRaw);
-        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          return;
-        }
-        if (mapPick.context === 'activity') {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          setActivityForm(prev => ({
-            ...prev,
-            location: mapPick.label || prev.location,
-            latitude: mapPick.lat,
-            longitude: mapPick.lng,
-          }));
-        }
-      } catch {
-        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+    const actPick = consumeTimedMapPick(MAP_PICK_KEY_ACTIVITY);
+    if (actPick?.context === 'activity') {
+      setActivityForm(prev => ({
+        ...prev,
+        location: actPick.label || prev.location,
+        latitude: actPick.lat,
+        longitude: actPick.lng,
+      }));
+    }
+
+    const evtPick = consumeTimedMapPick(MAP_PICK_KEY_EVENT);
+    if (evtPick?.context === 'event') {
+      setFormData(prev => ({
+        ...prev,
+        location: evtPick.label || prev.location,
+        latitude: evtPick.lat,
+        longitude: evtPick.lng,
+      }));
+    }
+
+    const legacyPick = consumeTimedMapPick(MAP_PICK_LEGACY);
+    if (legacyPick) {
+      if (legacyPick.context === 'activity') {
+        setActivityForm(prev => ({
+          ...prev,
+          location: legacyPick.label || prev.location,
+          latitude: legacyPick.lat,
+          longitude: legacyPick.lng,
+        }));
+      } else if (legacyPick.context !== 'shared-activity') {
+        setFormData(prev => ({
+          ...prev,
+          location: legacyPick.label || prev.location,
+          latitude: legacyPick.lat,
+          longitude: legacyPick.lng,
+        }));
       }
     }
   }, [userId, eventData]);
@@ -921,7 +923,11 @@ const MyEvents = () => {
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || getEventStatus(event) === statusFilter.toLowerCase();
-    return matchesCategory && matchesSearch && matchesStatus;
+    const matchesOwnership =
+      ownershipFilter === 'all' ||
+      (ownershipFilter === 'mine' && !event.isShared) ||
+      (ownershipFilter === 'shared' && event.isShared);
+    return matchesCategory && matchesSearch && matchesStatus && matchesOwnership;
   });
 
   // --- 7. NEW CALENDAR LOGIC (date-fns & framer-motion) ---
@@ -999,7 +1005,9 @@ const MyEvents = () => {
 
     const { data, error } = await supabase.from('events').update(updateData).eq('id', event.id).select();
     if (data && !error) {
-      setEventData(prev => prev.map(ev => ev.id === event.id ? generateDynamicProps(data[0]) : ev));
+      setEventData(prev => prev.map(ev =>
+        ev.id === event.id ? { ...generateDynamicProps(data[0]), isShared: ev.isShared } : ev
+      ));
     }
   };
 
@@ -1297,6 +1305,43 @@ const MyEvents = () => {
           ))}
         </div>
 
+        {/* Ownership filter (owned vs shared with me) */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center',
+            marginBottom: '12px',
+          }}
+        >
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#1a365d', marginRight: '4px' }}>Events:</span>
+          {[
+            { key: 'all', label: 'All', count: eventData.length },
+            { key: 'mine', label: 'My events', count: myEventsCount },
+            { key: 'shared', label: 'Shared with me', count: sharedWithMeCount },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setOwnershipFilter(key)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '999px',
+                border: ownershipFilter === key ? '2px solid #4396D1' : '1px solid #cbd5e1',
+                background: ownershipFilter === key ? '#E8F4FC' : '#fff',
+                color: '#334155',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+              <span style={{ marginLeft: '6px', opacity: 0.75, fontWeight: 700 }}>{count}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Filter Bar */}
         <div className={styles.filterBar}>
           {/* Category dropdown */}
@@ -1412,7 +1457,15 @@ const MyEvents = () => {
             <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
               {filteredEvents.length === 0 ? (
                 <div className={styles.emptyState}>
-                  {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+                  {ownershipFilter === 'shared' && sharedWithMeCount === 0
+                    ? 'Nothing has been shared with you yet. When someone adds you as a collaborator, their event will appear here.'
+                    : ownershipFilter === 'mine' && myEventsCount === 0
+                      ? 'You have no events you own yet. Click "Add" to create one.'
+                      : statusFilter === 'Done'
+                        ? 'No completed events yet.'
+                        : statusFilter === 'Upcoming'
+                          ? 'No upcoming events. Click "Add" to create one!'
+                          : 'No events match these filters.'}
                 </div>
               ) : viewMode === 'grid' ? (
                 // ── GRID VIEW (existing) ──────────────────────────────────────────────
@@ -1444,7 +1497,7 @@ const MyEvents = () => {
                             border: '0.5px solid rgba(255, 255, 255, 0.3)',
                             backdropFilter: 'blur(8px)',
                           }}>
-                            🔗 Shared
+                            Shared with me
                           </span>
                         )}
                         <span
@@ -1521,7 +1574,7 @@ const MyEvents = () => {
                               border: '0.5px solid rgba(255, 255, 255, 0.3)',
                               whiteSpace: 'nowrap',
                             }}>
-                              🔗 Shared
+                              Shared with me
                             </span>
                           )}
                           <span
