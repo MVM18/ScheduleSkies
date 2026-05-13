@@ -174,3 +174,18 @@ ALTER TABLE public.itinerary_activities ADD COLUMN IF NOT EXISTS longitude NUMER
 -- SELECT * FROM public.saved_itineraries LIMIT 1;
 -- SELECT * FROM public.user_analytics LIMIT 1;
 -- SELECT * FROM public.itinerary_activities LIMIT 1;
+
+-- ============================================================================
+-- 7. PROFILE AVATAR + STORAGE (run after project exists)
+-- ============================================================================
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Public avatar images are readable" ON storage.objects;
+CREATE POLICY "Public avatar images are readable"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'avatars');
