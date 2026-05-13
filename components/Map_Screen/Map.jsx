@@ -15,7 +15,6 @@ const GEOAPIFY_API_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
 const WEATHER_API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
 const mapStyle = 'osm-bright';
 
-/** Map pick `from` query values that represent itinerary activity pins (not event venue). */
 const isActivityPickContext = (ctx) => ctx === 'activity' || ctx === 'shared-activity';
 
 const createIcon = (color) => L.divIcon({
@@ -94,7 +93,6 @@ function FlyTo({ coords }) {
   return null;
 }
 
-/** Leaflet needs a non-zero container size; flex parents often resolve late — invalidate after layout. */
 function MapResizeHelper() {
   const map = useMap();
   useEffect(() => {
@@ -343,6 +341,7 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon, isMobile })
     </div>
   );
 }
+
 const getTrafficColor = (segmentIndex, totalSegments) => {
   const currentHour = new Date().getHours();
   const isWeekend = [0, 6].includes(new Date().getDay());
@@ -408,6 +407,7 @@ const getTrafficSummary = (segments) => {
   }
   return { level: overallLevel, color: overallColor, heavySegments: heavyCount, moderateSegments: moderateCount, lightSegments: lightCount, avgDelayFactor };
 };
+
 const getMockPlaces = (routeCoords) => {
   if (!routeCoords || routeCoords.length === 0) return [];
   return [
@@ -427,6 +427,7 @@ const getMockPlaces = (routeCoords) => {
     { name: 'Ramen Yushoken', lat: 10.3185, lng: 123.9048, type: 'restaurant', distance: 190, rating: 4.6 },
   ];
 };
+
 const findPlacesAlongRoute = async (routeCoords) => {
   if (!routeCoords || routeCoords.length === 0) return [];
   const places = [];
@@ -495,6 +496,7 @@ const findPlacesAlongRoute = async (routeCoords) => {
   places.sort((a, b) => a.distance - b.distance);
   return places.slice(0, 25);
 };
+
 const findPlacesNearPoint = async (lat, lng) => {
   try {
     const categories = [
@@ -1012,7 +1014,7 @@ const MapScreen = ({
       <div
         style={{
           position: 'absolute',
-          bottom: 0,
+          bottom: isMobile ? '100px' : 0,
           left: 0,
           right: 0,
           zIndex: 1002,
@@ -1021,47 +1023,33 @@ const MapScreen = ({
           borderTopLeftRadius: '20px',
           borderTopRightRadius: '20px',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.15)',
-          maxHeight: '70vh',
+          maxHeight: isMobile ? '40vh' : '50vh',
+          width: isMobile ? '100%' : 'auto',
+          maxWidth: isMobile ? '100%' : '1000px',
+          margin: isMobile ? '2' : '0 auto',
           overflowY: 'auto',
-          margin: '0 auto',
-          width: '100%',
-          maxWidth: '720px',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px', marginBottom: '8px' }}>
-          <div style={{ width: '40px', height: '4px', background: '#CBD5E0', borderRadius: '2px' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '6px', marginBottom: '4px' }}>
+          <div style={{ width: '32px', height: '4px', background: '#CBD5E0', borderRadius: '2px' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 10px', borderBottom: '1px solid #EDF2F7' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D' }}>📍 Suggested Places</div>
-          <button
-            type="button"
-            onClick={() => setShowPlacesPanel(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '18px',
-              cursor: 'pointer',
-              color: '#666',
-              padding: '4px 8px',
-            }}
-          >
-            ✕
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px 8px', borderBottom: '1px solid #EDF2F7' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A365D' }}>📍 Suggested Places</div>
+          <button onClick={() => setShowPlacesPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666', padding: '2px 6px' }}>✕</button>
         </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '8px 12px', borderBottom: '1px solid #EDF2F7' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '6px 10px', borderBottom: '1px solid #EDF2F7' }}>
           {placeFilterOptions.map(option => (
             <button
               key={option.key}
-              type="button"
               onClick={() => setPlaceTypeFilter(option.key)}
               style={{
-                padding: '4px 10px',
+                padding: '3px 8px',
                 borderRadius: '12px',
                 border: 'none',
                 background: placeTypeFilter === option.key ? '#2C5282' : '#EDF2F7',
                 color: placeTypeFilter === option.key ? 'white' : '#333',
                 cursor: 'pointer',
-                fontSize: '10px',
+                fontSize: '9px',
                 fontWeight: '600',
               }}
             >
@@ -1069,49 +1057,46 @@ const MapScreen = ({
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px 10px' }}>
           {getFilteredPlaces().length === 0 ? (
-            <div style={{ textAlign: 'center', fontSize: '12px', color: '#666', padding: '20px' }}>
-              No places found for this filter
-            </div>
+            <div style={{ textAlign: 'center', fontSize: '10px', color: '#666', padding: '16px' }}>No places found</div>
           ) : (
             getFilteredPlaces().map((place, i) => (
               <div
                 key={i}
                 style={{
                   background: '#f8f9fa',
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                   overflow: 'hidden',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                 }}
               >
-                <div style={{ height: '50px', background: `linear-gradient(135deg, ${getPlaceColor(place.type)}80, ${getPlaceColor(place.type)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                <div style={{ height: '36px', background: `linear-gradient(135deg, ${getPlaceColor(place.type)}80, ${getPlaceColor(place.type)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
                   {getPlaceIconForCard(place.type)}
                 </div>
-                <div style={{ padding: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                    <h4 style={{ fontSize: '11px', fontWeight: '700', color: '#1A365D', margin: 0, flex: 1 }}>{place.name}</h4>
-                    {place.rating && <div style={{ fontSize: '9px', fontWeight: '600', color: '#FFB800' }}>⭐ {place.rating}</div>}
+                <div style={{ padding: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
+                    <h4 style={{ fontSize: '9px', fontWeight: '700', color: '#1A365D', margin: 0, flex: 1 }}>{place.name}</h4>
+                    {place.rating && <div style={{ fontSize: '7px', fontWeight: '600', color: '#FFB800' }}>⭐ {place.rating}</div>}
                   </div>
-                  {place.address && <p style={{ fontSize: '8px', color: '#5a6b7c', margin: '0 0 4px', lineHeight: 1.2 }}>{place.address.length > 60 ? `${place.address.substring(0, 60)}…` : place.address}</p>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '8px', background: '#EDF2F7', padding: '1px 4px', borderRadius: '10px', color: '#2C5282', fontWeight: '500' }}>{place.type}</span>
-                      <span style={{ fontSize: '8px', color: '#4A5568' }}>📍 {place.distance}m</span>
+                  {place.address && <p style={{ fontSize: '6px', color: '#5a6b7c', margin: '0 0 2px', lineHeight: 1.2 }}>{place.address.length > 40 ? `${place.address.substring(0, 40)}…` : place.address}</p>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '6px', background: '#EDF2F7', padding: '1px 3px', borderRadius: '8px', color: '#2C5282', fontWeight: '500' }}>{place.type}</span>
+                      <span style={{ fontSize: '6px', color: '#4A5568' }}>📍 {place.distance}m</span>
                     </div>
                   </div>
                   <button
-                    type="button"
                     onClick={() => handleRerouteToPlace(place)}
                     style={{
                       width: '100%',
-                      padding: '5px 8px',
+                      padding: '3px 5px',
                       background: '#FF9800',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '5px',
                       cursor: 'pointer',
-                      fontSize: '10px',
+                      fontSize: '8px',
                       fontWeight: '600',
                     }}
                   >
@@ -1123,27 +1108,11 @@ const MapScreen = ({
           )}
         </div>
         {isRerouted && reroutedPlace && (
-          <div style={{ padding: '10px 12px', borderTop: '1px solid #EDF2F7' }}>
-            <div style={{ background: '#FFF3E0', padding: '8px', borderRadius: '10px', border: '1px solid #FF9800' }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: '#E65100', marginBottom: '4px' }}>Currently Rerouted</div>
-              <div style={{ fontSize: '10px', color: '#BF360C', marginBottom: '4px' }}>To: <strong>{reroutedPlace.name}</strong></div>
-              <button
-                type="button"
-                onClick={undoReroute}
-                style={{
-                  width: '100%',
-                  padding: '5px 8px',
-                  background: '#FF9800',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: '600',
-                }}
-              >
-                Undo Reroute
-              </button>
+          <div style={{ padding: '8px 10px', borderTop: '1px solid #EDF2F7' }}>
+            <div style={{ background: '#FFF3E0', padding: '6px', borderRadius: '8px', border: '1px solid #FF9800' }}>
+              <div style={{ fontSize: '9px', fontWeight: '700', color: '#E65100', marginBottom: '2px' }}>Currently Rerouted</div>
+              <div style={{ fontSize: '9px', color: '#BF360C', marginBottom: '2px' }}>To: <strong>{reroutedPlace.name}</strong></div>
+              <button onClick={undoReroute} style={{ width: '100%', padding: '4px 6px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '9px', fontWeight: '600' }}>Undo Reroute</button>
             </div>
           </div>
         )}
@@ -1151,7 +1120,6 @@ const MapScreen = ({
     </>
   );
 
-  /** Same shell as former “mobile” view: fixed viewport + explicit size so Leaflet always initializes. Desktop offsets for fixed sidebar (80px). */
   const mapShellLeft = isMobile ? 0 : 80;
   const mapShellWidth = isMobile ? '100vw' : 'calc(100vw - 80px)';
 
@@ -1214,9 +1182,16 @@ const MapScreen = ({
 
           {!pickMode && (
             <div style={{ position: 'absolute', top: '80px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => setShowSearchPanel(!showSearchPanel)} style={{ backgroundColor: showSearchPanel ? '#2C5282' : '#ffffff', color: showSearchPanel ? 'white' : '#2C5282', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>🗺️ {showSearchPanel ? 'Hide Route' : 'Show Route'}</button>
+              <button onClick={() => setShowSearchPanel(!showSearchPanel)} style={{ backgroundColor: showSearchPanel ? '#2C5282' : '#ffffff', color: showSearchPanel ? 'white' : '#2C5282', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
+                🗺️ {showSearchPanel ? 'Hide Route' : 'Show Route'}
+              </button>
+              <button onClick={() => setShowPlacesPanel(!showPlacesPanel)} style={{ backgroundColor: showPlacesPanel ? '#FF9800' : '#ffffff', color: showPlacesPanel ? 'white' : '#FF9800', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
+                📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
+              </button>
               {waypointsList.length > 0 && (
-                <button onClick={() => setShowItineraryPanel(!showItineraryPanel)} style={{ backgroundColor: showItineraryPanel ? '#7B1FA2' : '#ffffff', color: showItineraryPanel ? 'white' : '#7B1FA2', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>📋 {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}</button>
+                <button onClick={() => setShowItineraryPanel(!showItineraryPanel)} style={{ backgroundColor: showItineraryPanel ? '#7B1FA2' : '#ffffff', color: showItineraryPanel ? 'white' : '#7B1FA2', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
+                  📋 {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}
+                </button>
               )}
             </div>
           )}
@@ -1251,30 +1226,6 @@ const MapScreen = ({
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {!pickMode && nearbyPlaces.length > 0 && (
-            <div style={{ position: 'absolute', bottom: '80px', right: '10px', zIndex: 1002, pointerEvents: 'auto' }}>
-              <button
-                onClick={() => setShowPlacesPanel(!showPlacesPanel)}
-                style={{
-                  backgroundColor: '#FF9800',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '30px',
-                  padding: '8px 16px',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
-              </button>
             </div>
           )}
 
