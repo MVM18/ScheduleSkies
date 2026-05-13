@@ -1,27 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.replace('Bearer ', '');
+  const token = authHeader?.replace(/^Bearer\s+/i, '')?.trim();
 
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Verify token and get user
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  // Per-request client so PostgREST runs as this user (RLS sees auth.uid()).
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    }
+  );
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
   try {
     if (req.method === 'GET') {
-      // Fetch complete profile with relations
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -56,14 +58,13 @@ export default async function handler(req, res) {
         analytics: analytics || {
           trips_taken: 0,
           places_visited: 0,
-          most_visited_city: null
+          most_visited_city: null,
         },
-        email: user.email
+        email: user.email,
       });
     }
 
     if (req.method === 'PUT') {
-      // Keep profile updates minimal and resilient to schema drift.
       const { full_name, email_updates } = req.body;
 
       const { data, error } = await supabase
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
             id: user.id,
             full_name,
             email_updates,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           },
           { onConflict: 'id' }
         )
