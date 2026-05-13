@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -16,18 +16,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [resetNotice, setResetNotice] = useState('')
-
-  useEffect(() => {
-    const q = router.query.reset
-    if (q === 'sent') {
-      setResetNotice('If an account exists for that email, a reset link is on the way. Log in again after you update your password.')
-    } else if (q === 'done') {
-      setResetNotice('Your password was updated. You can log in with your new password.')
-    } else {
-      setResetNotice('')
-    }
-  }, [router.query.reset])
 
   const handleLogin = async (event) => {
     event.preventDefault()
@@ -68,12 +56,6 @@ export default function LoginPage() {
 
           <h1 className={styles.heading}>Welcome back</h1>
           <p className={styles.subheading}>Log in to continue planning smarter trips.</p>
-
-          {resetNotice ? (
-            <p className={`${styles.message} ${styles.success}`} style={{ marginBottom: '0.75rem' }}>
-              {resetNotice}
-            </p>
-          ) : null}
 
           <form onSubmit={handleLogin} className={styles.form}>
             <div className={styles.field}>

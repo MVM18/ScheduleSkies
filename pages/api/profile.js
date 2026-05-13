@@ -1,5 +1,6 @@
-import { requireUserFromRequest } from '@/lib/supabaseServiceRole'
+import { createClient } from '@supabase/supabase-js';
 
+<<<<<<< HEAD
 function eventStatus(ev) {
   const now = new Date()
   const endDate = ev.end_datetime
@@ -70,17 +71,37 @@ export default async function handler(req, res) {
   );
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
+=======
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+export default async function handler(req, res) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '');
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Verify token and get user
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+>>>>>>> parent of dc7bc6e (Profile Page Revamp)
   if (userError || !user) {
     return res.status(401).json({ error: 'Invalid token' });
   }
-  const { db, user } = auth
 
   try {
     if (req.method === 'GET') {
+<<<<<<< HEAD
       const [{ data: profile, error: profileError }, { data: events }] = await Promise.all([
         db.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         db.from('events').select('*').eq('user_id', user.id).order('date', { ascending: true }),
       ])
+=======
+      // Fetch complete profile with relations
+>>>>>>> parent of dc7bc6e (Profile Page Revamp)
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -88,38 +109,60 @@ export default async function handler(req, res) {
         .single();
 
       if (profileError && profileError.code !== 'PGRST116') {
-        throw profileError
+        throw profileError;
       }
 
-      const event_summaries = buildEventSummaries(events || [])
+      const { data: locations } = await supabase
+        .from('saved_locations')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const { data: itineraries } = await supabase
+        .from('saved_itineraries')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('start_date', { ascending: true });
+
+      const { data: analytics } = await supabase
+        .from('user_analytics')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
       return res.status(200).json({
         profile: profile || {},
-        event_summaries,
-        email: user.email,
-      })
+        saved_locations: locations || [],
+        saved_itineraries: itineraries || [],
+        analytics: analytics || {
+          trips_taken: 0,
+          places_visited: 0,
+          most_visited_city: null
+        },
+        email: user.email
+      });
     }
 
     if (req.method === 'PUT') {
-      const body = req.body || {}
-      const { data: existing, error: exErr } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      if (exErr) throw exErr
+      // Update profile preferences
+      const { full_name, budget_php, environment, pace, email_updates } = req.body;
 
-      // Only columns present on a minimal Supabase `profiles` table (avoids schema cache errors
-      // when optional columns like `environment` were never migrated).
-      const merged = {
-        id: user.id,
-        updated_at: new Date().toISOString(),
-      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          full_name,
+          budget_php: Number(budget_php),
+          environment,
+          pace,
+          email_updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single();
 
-      if (existing?.avatar_url != null && existing.avatar_url !== '') {
-        merged.avatar_url = existing.avatar_url
-      }
-      if (body.full_name !== undefined) {
-        merged.full_name = typeof body.full_name === 'string' ? body.full_name.trim() : body.full_name
-      }
-      if (body.avatar_url !== undefined) merged.avatar_url = body.avatar_url
+      if (error) throw error;
 
+<<<<<<< HEAD
       if (!existing) {
         merged.full_name = merged.full_name || user.email?.split('@')[0] || 'User'
       }
@@ -156,11 +199,14 @@ export default async function handler(req, res) {
       if (error) throw error
 
       return res.status(200).json({ success: true, profile: data })
+=======
+      return res.status(200).json({ success: true, profile: data });
+>>>>>>> parent of dc7bc6e (Profile Page Revamp)
     }
 
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('Profile API error:', error)
-    return res.status(500).json({ error: error.message })
+    console.error('Profile API error:', error);
+    return res.status(500).json({ error: error.message });
   }
 }
