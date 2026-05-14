@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { motion, AnimatePresence } from 'framer-motion';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -500,26 +501,26 @@ const findPlacesAlongRoute = async (routeCoords) => {
 const findPlacesNearPoint = async (lat, lng) => {
   try {
     if (!GEOAPIFY_API_KEY) {
-  console.error('GEOAPIFY_API_KEY is not set');
-  return [];
-}
+      console.error('GEOAPIFY_API_KEY is not set');
+      return [];
+    }
     const categories = [
-    'catering.restaurant',
-    'catering.cafe',
-    'parking',
-    'tourism.attraction',
-    'leisure.park',
-    'commercial.shopping_mall', 
-    'accommodation.hotel',
-  ];
+      'catering.restaurant',
+      'catering.cafe',
+      'parking',
+      'tourism.attraction',
+      'leisure.park',
+      'commercial.shopping_mall',
+      'accommodation.hotel',
+    ];
     const url = `https://api.geoapify.com/v2/places?categories=${categories.join(',')}&filter=circle:${lng},${lat},5000&limit=20&apiKey=${GEOAPIFY_API_KEY}`;
     const response = await fetch(url);
     const data = await response.json();
 
     if (data.statusCode || data.message) {
-  console.error('Geoapify API error:', data.statusCode, data.message);
-  return [];
-}
+      console.error('Geoapify API error:', data.statusCode, data.message);
+      return [];
+    }
 
     if (!data.features || data.features.length === 0) {
       console.warn('Geoapify returned no features for:', lat, lng);
@@ -559,6 +560,32 @@ const findPlacesNearPoint = async (lat, lng) => {
     return [];
   }
 };
+
+// ========== Animated Polyline (unchanged from earlier version) ==========
+const AnimatedPolyline = ({ positions, pathOptions, shouldAnimate }) => {
+  const polylineRef = useRef(null);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  useEffect(() => {
+    if (shouldAnimate && polylineRef.current && !hasAnimated) {
+      const timeout = setTimeout(() => {
+        const pathElement = polylineRef.current?.getElement?.();
+        if (pathElement && typeof pathElement.getTotalLength === 'function') {
+          const length = pathElement.getTotalLength();
+          pathElement.style.strokeDasharray = length;
+          pathElement.style.strokeDashoffset = length;
+          pathElement.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+          pathElement.style.strokeDashoffset = '0';
+          setHasAnimated(true);
+        }
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [shouldAnimate, hasAnimated, positions]);
+
+  return <Polyline ref={polylineRef} positions={positions} pathOptions={pathOptions} />;
+};
+// =============================================================
 
 const MapScreen = ({
   venueCoords,
@@ -989,7 +1016,14 @@ const MapScreen = ({
       {userLocation && !origin && !pickMode && <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}><Popup><strong>Your Location</strong></Popup></Marker>}
       {!pickMode && origin && <Marker position={[origin.lat, origin.lng]} icon={originIcon}><Popup><strong>Origin</strong><br />{origin.label}</Popup></Marker>}
       {!pickMode && destination && <Marker position={[destination.lat, destination.lng]} icon={destIcon}><Popup><strong>Destination</strong><br />{destination.label}{isRerouted && <div style={{ color: '#FF9800', marginTop: '5px' }}>Rerouted</div>}</Popup></Marker>}
-      {!pickMode && routeSegments.map((segment, idx) => <Polyline key={idx} positions={[segment.start, segment.end]} pathOptions={{ color: segment.color, weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }} />)}
+      {!pickMode && routeSegments.map((segment, idx) => (
+        <AnimatedPolyline 
+          key={idx} 
+          positions={[segment.start, segment.end]} 
+          pathOptions={{ color: segment.color, weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }}
+          shouldAnimate={!!routeSegments.length && idx === 0}
+        />
+      ))}
       {!pickMode && getFilteredPlaces().map((place, idx) => (
         <Marker key={idx} position={[place.lat, place.lng]} icon={createPlaceIcon(place.type, false)}>
           <Popup>
@@ -1005,129 +1039,346 @@ const MapScreen = ({
     </>
   );
 
-  const renderPlacesBottomSheet = () => (
-    <>
-      <div
-        onClick={() => setShowPlacesPanel(false)}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1001,
-          background: 'rgba(0, 0, 0, 0.3)',
-          pointerEvents: 'auto',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: isMobile ? '100px' : 0,
-          left: 0,
-          right: 0,
-          zIndex: 1002,
-          pointerEvents: 'auto',
-          background: 'white',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          boxShadow: '0 -4px 16px rgba(0,0,0,0.15)',
-          maxHeight: isMobile ? '40vh' : '50vh',
-          width: isMobile ? '100%' : 'auto',
-          maxWidth: isMobile ? '100%' : '1000px',
-          margin: isMobile ? '2' : '0 auto',
-          overflowY: 'auto',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '6px', marginBottom: '4px' }}>
-          <div style={{ width: '32px', height: '4px', background: '#CBD5E0', borderRadius: '2px' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 12px 8px', borderBottom: '1px solid #EDF2F7' }}>
-          <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A365D' }}>📍 Suggested Places</div>
-          <button onClick={() => setShowPlacesPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666', padding: '2px 6px' }}>✕</button>
-        </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '6px 10px', borderBottom: '1px solid #EDF2F7' }}>
-          {placeFilterOptions.map(option => (
-            <button
-              key={option.key}
-              onClick={() => setPlaceTypeFilter(option.key)}
-              style={{
-                padding: '3px 8px',
-                borderRadius: '12px',
-                border: 'none',
-                background: placeTypeFilter === option.key ? '#2C5282' : '#EDF2F7',
-                color: placeTypeFilter === option.key ? 'white' : '#333',
-                cursor: 'pointer',
-                fontSize: '9px',
-                fontWeight: '600',
-              }}
-            >
-              {option.icon} {option.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px 10px' }}>
-          {getFilteredPlaces().length === 0 ? (
-            <div style={{ textAlign: 'center', fontSize: '10px', color: '#666', padding: '16px' }}>No places found</div>
-          ) : (
-            getFilteredPlaces().map((place, i) => (
-              <div
-                key={i}
-                style={{
-                  background: '#f8f9fa',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                }}
-              >
-                <div style={{ height: '36px', background: `linear-gradient(135deg, ${getPlaceColor(place.type)}80, ${getPlaceColor(place.type)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
-                  {getPlaceIconForCard(place.type)}
+  // ========== Bottom Sheet with Framer Motion ==========
+ // ========== UPDATED: Beautiful Bottom Sheet with Slide-Up Animation ==========
+const renderPlacesBottomSheet = () => (
+  <AnimatePresence>
+    {showPlacesPanel && (
+      <>
+        <motion.div
+          key="overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setShowPlacesPanel(false)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1001,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(2px)',
+            pointerEvents: 'auto',
+          }}
+        />
+        <motion.div
+          key="sheet"
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 280, mass: 0.8 }}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1002,
+            pointerEvents: 'auto',
+            background: '#ffffff',
+            borderTopLeftRadius: '24px',
+            borderTopRightRadius: '24px',
+            boxShadow: '0 -8px 30px rgba(0,0,0,0.12)',
+            maxHeight: isMobile ? '65vh' : '55vh',
+            width: isMobile ? '100%' : 'auto',
+            maxWidth: isMobile ? '100%' : '1000px',
+            margin: isMobile ? '0' : '0 auto',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Custom scrollbar styles */}
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              width: 4px;
+            }
+            div::-webkit-scrollbar-track {
+              background: #f1f1f1;
+              border-radius: 10px;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: #cbd5e0;
+              border-radius: 10px;
+            }
+          `}</style>
+
+          {/* Drag handle */}
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 8px' }}>
+            <div style={{ width: '40px', height: '4px', background: '#cbd5e0', borderRadius: '4px' }} />
+          </div>
+
+          {/* Header with gradient */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%)',
+              margin: '0 16px 12px 16px',
+              borderRadius: '20px',
+              padding: '12px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>📍</span>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: 'white', letterSpacing: '-0.3px' }}>
+                  Suggested Places
                 </div>
-                <div style={{ padding: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
-                    <h4 style={{ fontSize: '9px', fontWeight: '700', color: '#1A365D', margin: 0, flex: 1 }}>{place.name}</h4>
-                    {place.rating && <div style={{ fontSize: '7px', fontWeight: '600', color: '#FFB800' }}>⭐ {place.rating}</div>}
-                  </div>
-                  {place.address && <p style={{ fontSize: '6px', color: '#5a6b7c', margin: '0 0 2px', lineHeight: 1.2 }}>{place.address.length > 40 ? `${place.address.substring(0, 40)}…` : place.address}</p>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <span style={{ fontSize: '6px', background: '#EDF2F7', padding: '1px 3px', borderRadius: '8px', color: '#2C5282', fontWeight: '500' }}>{place.type}</span>
-                      <span style={{ fontSize: '6px', color: '#4A5568' }}>📍 {place.distance}m</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleRerouteToPlace(place)}
-                    style={{
-                      width: '100%',
-                      padding: '3px 5px',
-                      background: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer',
-                      fontSize: '8px',
-                      fontWeight: '600',
-                    }}
-                  >
-                    Reroute Here
-                  </button>
+                <div style={{ fontSize: '10px', color: '#bee3f8', marginTop: '2px' }}>
+                  {nearbyPlaces.length} spots nearby
                 </div>
               </div>
-            ))
-          )}
-        </div>
-        {isRerouted && reroutedPlace && (
-          <div style={{ padding: '8px 10px', borderTop: '1px solid #EDF2F7' }}>
-            <div style={{ background: '#FFF3E0', padding: '6px', borderRadius: '8px', border: '1px solid #FF9800' }}>
-              <div style={{ fontSize: '9px', fontWeight: '700', color: '#E65100', marginBottom: '2px' }}>Currently Rerouted</div>
-              <div style={{ fontSize: '9px', color: '#BF360C', marginBottom: '2px' }}>To: <strong>{reroutedPlace.name}</strong></div>
-              <button onClick={undoReroute} style={{ width: '100%', padding: '4px 6px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '9px', fontWeight: '600' }}>Undo Reroute</button>
             </div>
+            <button
+              onClick={() => setShowPlacesPanel(false)}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                borderRadius: '30px',
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white',
+                fontSize: '16px',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              ✕
+            </button>
           </div>
-        )}
-      </div>
-    </>
-  );
+
+          {/* Filter chips */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap',
+              padding: '0 16px 12px 16px',
+              borderBottom: '1px solid #edf2f7',
+            }}
+          >
+            {placeFilterOptions.map(option => (
+              <button
+                key={option.key}
+                onClick={() => setPlaceTypeFilter(option.key)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '40px',
+                  border: 'none',
+                  background: placeTypeFilter === option.key
+                    ? 'linear-gradient(135deg, #2c5282, #2b6cb0)'
+                    : '#f0f4f8',
+                  color: placeTypeFilter === option.key ? 'white' : '#2d3748',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: placeTypeFilter === option.key ? '0 2px 8px rgba(43,108,176,0.3)' : 'none',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => {
+                  if (placeTypeFilter !== option.key) e.currentTarget.style.background = '#e2e8f0';
+                }}
+                onMouseLeave={e => {
+                  if (placeTypeFilter !== option.key) e.currentTarget.style.background = '#f0f4f8';
+                }}
+              >
+                <span style={{ fontSize: '13px' }}>{option.icon}</span> {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Places list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
+            {getFilteredPlaces().length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  color: '#718096',
+                  padding: '32px 16px',
+                  background: '#f7fafc',
+                  borderRadius: '20px',
+                }}
+              >
+                ✨ No places found. Try a different filter.
+              </div>
+            ) : (
+              getFilteredPlaces().map((place, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03, duration: 0.2 }}
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)',
+                    border: '1px solid #edf2f7',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer',
+                  }}
+                  whileHover={{ scale: 1.01, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}
+                  onClick={() => handleRerouteToPlace(place)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '12px' }}>
+                    {/* Icon / Emoji with gradient background */}
+                    <div
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        background: `linear-gradient(135deg, ${getPlaceColor(place.type)}20, ${getPlaceColor(place.type)}40)`,
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                        marginRight: '14px',
+                      }}
+                    >
+                      {getPlaceIconForCard(place.type)}
+                    </div>
+
+                    {/* Content */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div>
+                          <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#1a202c', margin: 0 }}>
+                            {place.name}
+                          </h4>
+                          {place.address && (
+                            <p style={{ fontSize: '10px', color: '#718096', margin: '4px 0 0', lineHeight: 1.3 }}>
+                              {place.address.length > 45 ? `${place.address.substring(0, 45)}…` : place.address}
+                            </p>
+                          )}
+                        </div>
+                        {place.rating && (
+                          <div
+                            style={{
+                              background: '#fef5e7',
+                              padding: '3px 8px',
+                              borderRadius: '30px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              color: '#d69e2e',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ⭐ {place.rating.toFixed(1)}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            background: '#f0f4f8',
+                            padding: '3px 10px',
+                            borderRadius: '30px',
+                            color: '#2c5282',
+                            fontWeight: '600',
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {place.type}
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          📍 {place.distance}m away
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action button (subtle) */}
+                  <div
+                    style={{
+                      borderTop: '1px solid #edf2f7',
+                      padding: '8px 12px',
+                      background: '#fafcff',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: '#ff9800',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      Reroute here →
+                    </span>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
+
+          {/* Reroute undo banner */}
+          {isRerouted && reroutedPlace && (
+            <div style={{ padding: '12px 16px 20px', borderTop: '1px solid #edf2f7', background: '#fffaf0' }}>
+              <div
+                style={{
+                  background: '#fff3e0',
+                  padding: '10px 14px',
+                  borderRadius: '16px',
+                  border: '1px solid #ffe0b5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>🔄</span>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#e65100' }}>Currently rerouted</div>
+                    <div style={{ fontSize: '11px', color: '#bf360c' }}>To: <strong>{reroutedPlace.name}</strong></div>
+                  </div>
+                </div>
+                <button
+                  onClick={undoReroute}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#ff9800',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '30px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    boxShadow: '0 2px 6px rgba(255,152,0,0.3)',
+                  }}
+                >
+                  Undo reroute
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </>
+    )}
+  </AnimatePresence>
+);
 
   const mapShellLeft = isMobile ? 0 : 80;
   const mapShellWidth = isMobile ? '100vw' : 'calc(100vw - 80px)';
@@ -1205,40 +1456,336 @@ const MapScreen = ({
             </div>
           )}
 
-          {showSearchPanel && (
-            <div style={{ position: 'absolute', top: '130px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '50%', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}><div style={{ fontSize: '12px', fontWeight: '800', color: '#1A365D' }}>📍 Route Planner</div><button onClick={() => setShowSearchPanel(false)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>✕</button></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <SearchInput placeholder="From" value={originText} onChange={setOriginText} onSelect={handleOriginSelect} icon="🟦" isMobile={true} />
-                  <button onClick={getUserLocation} style={{ padding: '6px 10px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>📍</button>
-                </div>
-                <SearchInput placeholder="To" value={destText} onChange={setDestText} onSelect={handleDestSelect} icon="🔴" isMobile={true} />
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '4px', background: '#EDF2F7', borderRadius: '20px', padding: '2px' }}>
-                    <button onClick={() => setMapClickMode('origin')} style={{ padding: '3px 8px', borderRadius: '16px', border: 'none', background: mapClickMode === 'origin' ? '#2C5282' : 'transparent', color: mapClickMode === 'origin' ? 'white' : '#4A5568', fontWeight: '600', fontSize: '9px', cursor: 'pointer' }}>Origin</button>
-                    <button onClick={() => setMapClickMode('destination')} style={{ padding: '3px 8px', borderRadius: '16px', border: 'none', background: mapClickMode === 'destination' ? '#2C5282' : 'transparent', color: mapClickMode === 'destination' ? 'white' : '#4A5568', fontWeight: '600', fontSize: '9px', cursor: 'pointer' }}>Dest</button>
-                  </div>
-                  {modeOptions.map(({ key, icon, label }) => (
-                    <button key={key} onClick={() => setRouteMode(key)} title={label} style={{ padding: '5px 8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s', background: routeMode === key ? '#2C5282' : '#EDF2F7', transform: routeMode === key ? 'scale(1.1)' : 'scale(1)' }}>{icon}</button>
-                  ))}
-                  <button onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)} disabled={isRouting} style={{ marginLeft: 'auto', padding: '6px 16px', borderRadius: '10px', border: 'none', background: '#2C5282', color: 'white', fontWeight: '700', fontSize: '12px', cursor: isRouting ? 'not-allowed' : 'pointer', opacity: isRouting ? 0.6 : 1 }}>{isRouting ? '...' : 'Go'}</button>
-                  {isRerouted && <button onClick={undoReroute} style={{ padding: '6px 8px', borderRadius: '8px', border: 'none', background: '#FF9800', color: 'white', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>Undo</button>}
-                  {(origin || destination || routeCoords) && <button onClick={clearAll} style={{ padding: '6px 8px', borderRadius: '8px', border: 'none', background: '#FED7D7', color: '#C53030', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>Clear</button>}
-                </div>
-                {routeError && <div style={{ fontSize: '11px', color: '#E53E3E', padding: '5px 8px', background: '#FFF5F5', borderRadius: '8px' }}>⚠️ {routeError}</div>}
-                {routeInfo && (
-                  <div style={{ display: 'flex', gap: '8px', padding: '5px 10px', background: '#EBF8FF', borderRadius: '8px', fontSize: '11px', fontWeight: '700', color: '#2C5282', justifyContent: 'space-between' }}>
-                    <span>📏 {routeInfo.distance} km</span>
-                    <span>⏱ {routeInfo.adjustedTime} min</span>
-                    {routeInfo.trafficDelay > 0 && <span>🚦 +{routeInfo.trafficDelay} min</span>}
-                  </div>
-                )}
-              </div>
+          {/* Animated Search Panel with Scale */}
+          {/* Animated Search Panel with Premium Design */}
+<AnimatePresence>
+  {showSearchPanel && (
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
+      style={{
+        position: 'absolute',
+        top: '130px',
+        left: '10px',
+        right: '10px',
+        zIndex: 1002,
+        pointerEvents: 'auto',
+        background: 'rgba(255,255,255,0.98)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '28px',
+        boxShadow: '0 20px 35px -12px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.02)',
+        overflow: 'hidden',
+        transformOrigin: 'top center',
+      }}
+    >
+      {/* Header with gradient */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%)',
+          padding: '16px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '22px' }}>🗺️</span>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'white', letterSpacing: '-0.3px' }}>
+              Route Planner
+            </div>
+            <div style={{ fontSize: '11px', color: '#bee3f8', marginTop: '2px' }}>
+              Plan your journey
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowSearchPanel(false)}
+          style={{
+            background: 'rgba(255,255,255,0.15)',
+            border: 'none',
+            borderRadius: '30px',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: 'white',
+            fontSize: '18px',
+            backdropFilter: 'blur(4px)',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Main content */}
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Origin input with my location button */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <SearchInput
+                placeholder="From – your starting point"
+                value={originText}
+                onChange={setOriginText}
+                onSelect={handleOriginSelect}
+                icon="🟦"
+                isMobile={true}
+              />
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={getUserLocation}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '16px',
+                border: 'none',
+                background: '#edf2f7',
+                color: '#2c5282',
+                cursor: 'pointer',
+                fontSize: '18px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+              }}
+              title="Use my current location"
+            >
+              📍
+            </motion.button>
+          </div>
+
+          {/* Destination input */}
+          <SearchInput
+            placeholder="To – your destination"
+            value={destText}
+            onChange={setDestText}
+            onSelect={handleDestSelect}
+            icon="🔴"
+            isMobile={true}
+          />
+
+          {/* Mode selector + actions row */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+            {/* Map click mode toggle */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '4px',
+                background: '#f0f4f8',
+                borderRadius: '40px',
+                padding: '4px',
+              }}
+            >
+              <button
+                onClick={() => setMapClickMode('origin')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '32px',
+                  border: 'none',
+                  background: mapClickMode === 'origin' ? '#2c5282' : 'transparent',
+                  color: mapClickMode === 'origin' ? 'white' : '#4a5568',
+                  fontWeight: '600',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Set origin
+              </button>
+              <button
+                onClick={() => setMapClickMode('destination')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '32px',
+                  border: 'none',
+                  background: mapClickMode === 'destination' ? '#2c5282' : 'transparent',
+                  color: mapClickMode === 'destination' ? 'white' : '#4a5568',
+                  fontWeight: '600',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Set destination
+              </button>
+            </div>
+
+            {/* Travel mode selector */}
+            <div style={{ display: 'flex', gap: '6px', background: '#f0f4f8', borderRadius: '40px', padding: '4px' }}>
+              {modeOptions.map(({ key, icon, label }) => (
+                <motion.button
+                  key={key}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setRouteMode(key)}
+                  title={label}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '32px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    transition: 'all 0.2s',
+                    background: routeMode === key ? '#2c5282' : 'transparent',
+                    color: routeMode === key ? 'white' : '#4a5568',
+                  }}
+                >
+                  {icon}
+                </motion.button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => fetchRoute(origin || userLocation, destination, routeMode, false)}
+                disabled={isRouting}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '30px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #2c5282, #2b6cb0)',
+                  color: 'white',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: isRouting ? 'not-allowed' : 'pointer',
+                  opacity: isRouting ? 0.6 : 1,
+                  boxShadow: '0 4px 10px rgba(43,108,176,0.3)',
+                }}
+              >
+                {isRouting ? '⏳ Routing...' : 'Go →'}
+              </motion.button>
+
+              {isRerouted && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={undoReroute}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '30px',
+                    border: 'none',
+                    background: '#ff9800',
+                    color: 'white',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Undo
+                </motion.button>
+              )}
+
+              {(origin || destination || routeCoords) && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={clearAll}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '30px',
+                    border: 'none',
+                    background: '#fed7d7',
+                    color: '#c53030',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear all
+                </motion.button>
+              )}
+            </div>
+          </div>
+
+          {/* Error or route info */}
+          {routeError && (
+            <div
+              style={{
+                background: '#fff5f5',
+                padding: '10px 16px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                color: '#e53e3e',
+                border: '1px solid #fed7d7',
+              }}
+            >
+              ⚠️ {routeError}
             </div>
           )}
 
-          {!pickMode && nearbyPlaces.length > 0 && showPlacesPanel && renderPlacesBottomSheet()}
+          {routeInfo && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: '#ebf8ff',
+                padding: '12px 16px',
+                borderRadius: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                border: '1px solid #bee3f8',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#2c5282', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📏 {routeInfo.distance} km
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#2c5282', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ⏱ {routeInfo.adjustedTime} min
+                </span>
+                {routeInfo.trafficDelay > 0 && (
+                  <span style={{ fontSize: '12px', color: '#d69e2e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    🚦 +{routeInfo.trafficDelay} min delay
+                  </span>
+                )}
+              </div>
+              {trafficSummary && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '10px',
+                      background:
+                        trafficSummary.level === 'Heavy'
+                          ? '#c62828'
+                          : trafficSummary.level === 'Moderate'
+                          ? '#f57f17'
+                          : '#4caf50',
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#4a5568' }}>
+                    Traffic: {trafficSummary.level}
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+          {!pickMode && renderPlacesBottomSheet()}
 
           {!pickMode && waypointsList.length > 0 && showItineraryPanel && (
             <div style={{ position: 'absolute', bottom: '80px', right: '10px', left: '10px', zIndex: 1002, pointerEvents: 'auto', background: '#EDE7F6', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '40%', overflowY: 'auto' }}>
