@@ -1,44 +1,66 @@
 import { requireUserFromRequest } from '@/lib/supabaseServiceRole'
 
 function eventStatus(ev) {
-  const now = new Date()
-  const endDate = ev.end_datetime
-    ? new Date(ev.end_datetime)
-    : ev.date
-      ? new Date(`${ev.date}T23:59:59`)
-      : null
+  const now = new Date();
+
   const startDate = ev.start_datetime
     ? new Date(ev.start_datetime)
     : ev.date
       ? new Date(`${ev.date}T00:00:00`)
-      : null
-  if (!endDate && !startDate) return 'upcoming'
-  if (endDate && endDate < now) return 'done'
-  return 'upcoming'
+      : null;
+
+  const endDate = ev.end_datetime
+    ? new Date(ev.end_datetime)
+    : ev.date
+      ? new Date(`${ev.date}T23:59:59`)
+      : null;
+
+  if (!startDate && !endDate) return 'upcoming';
+
+  // DONE (already ended)
+  if (endDate && endDate < now) return 'done';
+
+  // ONGOING (currently happening)
+  if (startDate && endDate && startDate <= now && now <= endDate) {
+    return 'ongoing';
+  }
+
+  // NOT STARTED YET
+  if (startDate && startDate > now) return 'upcoming';
+
+  return 'upcoming';
 }
 
 function buildEventSummaries(events) {
-  const list = events || []
-  const upcoming = list.filter((e) => eventStatus(e) === 'upcoming')
-  const past = list.filter((e) => eventStatus(e) === 'done')
-  const byCategory = {}
+  const list = events || [];
+
+  const upcoming = list.filter((e) => eventStatus(e) === 'upcoming');
+  const ongoing = list.filter((e) => eventStatus(e) === 'ongoing');
+  const past = list.filter((e) => eventStatus(e) === 'done');
+
+  const byCategory = {};
+
   for (const e of list) {
-    const c = e.category || 'Other'
-    byCategory[c] = (byCategory[c] || 0) + 1
+    const c = e.category || 'Other';
+    byCategory[c] = (byCategory[c] || 0) + 1;
   }
-  let priceTotal = 0
+
+  let priceTotal = 0;
   for (const e of list) {
-    const p = parseFloat(e.price)
-    if (!Number.isNaN(p)) priceTotal += p
+    const p = parseFloat(e.price);
+    if (!Number.isNaN(p)) priceTotal += p;
   }
+
   const sortedUp = [...upcoming].sort((a, b) => {
-    const da = a.start_datetime || a.date
-    const db = b.start_datetime || b.date
-    return new Date(da || 0) - new Date(db || 0)
-  })
+    const da = a.start_datetime || a.date;
+    const db = b.start_datetime || b.date;
+    return new Date(da || 0) - new Date(db || 0);
+  });
+
   return {
     total: list.length,
     upcoming_count: upcoming.length,
+    ongoing_count: ongoing.length,
     past_count: past.length,
     by_category: byCategory,
     total_price_php: Math.round(priceTotal * 100) / 100,
@@ -50,7 +72,7 @@ function buildEventSummaries(events) {
       category: e.category,
       location: e.location,
     })),
-  }
+  };
 }
 
 export default async function handler(req, res) {

@@ -26,6 +26,7 @@ const THEME_STORAGE_KEY = 'schedule-skies-theme';
 const defaultEventSummaries = () => ({
   total: 0,
   upcoming_count: 0,
+  ongoing_count: 0,
   past_count: 0,
   by_category: {},
   total_price_php: 0,
@@ -389,8 +390,11 @@ const ProfilePage = () => {
                 <span>
                   {eventSummaries.total} plan event{eventSummaries.total === 1 ? '' : 's'}
                 </span>
+
                 <span>
-                  {eventSummaries.upcoming_count} upcoming · {eventSummaries.past_count} completed
+                  {eventSummaries.upcoming_count} upcoming ·{' '}
+                  {eventSummaries.ongoing_count} ongoing ·{' '}
+                  {eventSummaries.past_count} completed
                 </span>
               </div>
             </div>

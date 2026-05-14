@@ -12,7 +12,11 @@ import {
   Legend,
 } from 'recharts';
 
-const PIE_COLORS = ['#2563eb', '#94a3b8'];
+const PIE_COLORS = [
+  '#f59e0b', // ongoing
+  '#2563eb', // upcoming
+  '#94a3b8', // completed
+];
 const BAR_FILL = '#3b82f6';
 
 export default function ProfileEventCharts({ eventSummaries, themeMode }) {
@@ -23,6 +27,7 @@ export default function ProfileEventCharts({ eventSummaries, themeMode }) {
   const tooltipBorder = isDark ? '#475569' : '#e2e8f0';
 
   const total = eventSummaries?.total ?? 0;
+  const ongoing = eventSummaries?.ongoing_count ?? 0;
   const upcoming = eventSummaries?.upcoming_count ?? 0;
   const past = eventSummaries?.past_count ?? 0;
   const byCategory = eventSummaries?.by_category || {};
@@ -39,17 +44,21 @@ export default function ProfileEventCharts({ eventSummaries, themeMode }) {
     );
   }
 
-  let pieData;
-  if (upcoming > 0 && past > 0) {
-    pieData = [
-      { name: 'Upcoming', value: upcoming },
-      { name: 'Completed', value: past },
-    ];
-  } else if (upcoming > 0) {
-    pieData = [{ name: 'Upcoming', value: upcoming }];
-  } else if (past > 0) {
-    pieData = [{ name: 'Completed', value: past }];
-  } else {
+  let pieData = [];
+
+  if (ongoing > 0) {
+    pieData.push({ name: 'Ongoing', value: ongoing });
+  }
+
+  if (upcoming > 0) {
+    pieData.push({ name: 'Upcoming', value: upcoming });
+  }
+
+  if (past > 0) {
+    pieData.push({ name: 'Completed', value: past });
+  }
+
+  if (pieData.length === 0) {
     pieData = [{ name: 'Events', value: total }];
   }
 

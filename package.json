@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.102.1",
+    "@supabase/supabase-js": "^2.105.4",
     "@tomtom-international/web-sdk-maps": "^6.25.0",
     "@tomtom-international/web-sdk-services": "^6.25.0",
     "axios": "^1.6.0",
@@ -23,11 +23,8 @@
     "react-dom": "^18.2.0",
     "react-icons": "^4.12.0",
     "react-leaflet": "^4.2.1",
-<<<<<<< HEAD
-    "recharts": "^2.15.0",
     "react-timekeeper": "^2.2.1",
-=======
->>>>>>> parent of dc7bc6e (Profile Page Revamp)
+    "recharts": "^2.15.0",
     "supabase": "^2.91.3"
   },
   "devDependencies": {

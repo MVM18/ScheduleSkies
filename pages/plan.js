@@ -205,15 +205,38 @@ const MyEvents = () => {
 
   const getEventStatus = (event) => {
     const now = new Date();
-    const endDate = event.end_datetime ? new Date(event.end_datetime) : (event.date ? new Date(event.date + 'T23:59:59') : null);
-    const startDate = event.start_datetime ? new Date(event.start_datetime) : (event.date ? new Date(event.date + 'T00:00:00') : null);
-    if (!endDate && !startDate) return 'upcoming';
-    if (endDate && endDate < now) return 'done';
+
+    const startDate = event.start_datetime
+      ? new Date(event.start_datetime)
+      : (event.date ? new Date(event.date + 'T00:00:00') : null);
+
+    const endDate = event.end_datetime
+      ? new Date(event.end_datetime)
+      : (event.date ? new Date(event.date + 'T23:59:59') : null);
+
+    if (!startDate && !endDate) return 'upcoming';
+
+    // Event already finished
+    if (endDate && endDate < now) {
+      return 'done';
+    }
+
+    // Event currently happening
+    if (
+      startDate &&
+      endDate &&
+      startDate <= now &&
+      endDate >= now
+    ) {
+      return 'ongoing';
+    }
+
+    // Event not started yet
     return 'upcoming';
   };
 
   const statusCounts = {
-    All: eventData.length,
+    Ongoing: eventData.filter(e => getEventStatus(e) === 'ongoing').length,
     Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
     Done: eventData.filter(e => getEventStatus(e) === 'done').length,
   };
@@ -1293,13 +1316,13 @@ const MyEvents = () => {
 
         {/* Status Filter Tabs */}
         <div className={styles.statusFilterBar}>
-          {['All', 'Upcoming', 'Done'].map(status => (
+          {['Ongoing', 'Upcoming', 'Done'].map(status => (
             <button
               key={status}
               className={`${styles.statusBtn} ${statusFilter === status ? styles.statusBtnActive : ''}`}
               onClick={() => setStatusFilter(status)}
             >
-              {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
+              {status === 'Ongoing'} {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
               <span className={styles.statusCount}>{statusCounts[status]}</span>
             </button>
           ))}
@@ -1485,6 +1508,18 @@ const MyEvents = () => {
                           <p>{event.title}</p>
                         </div>
                       </span>
+                      
+                      <span
+                        className={styles.cardStatusBadge}
+                        style={{
+                          background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                          color: status === 'done' ? '#15A862' : '#4396D1',
+                          border: '0.5px solid black'
+                        }}
+                      >
+                        {status === 'done' ? 'Done' : 'Upcoming'}
+                      </span>
+
                       <div style={{ display: 'flex', gap: '6px', position: 'absolute', bottom: '12px', left: '12px', right: '12px', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
                         {event.isShared && (
                           <span style={{
@@ -1500,16 +1535,6 @@ const MyEvents = () => {
                             Shared with me
                           </span>
                         )}
-                        <span
-                          className={styles.cardStatusBadge}
-                          style={{
-                            background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                            color: status === 'done' ? '#15A862' : '#4396D1',
-                            border: '0.5px solid black'
-                          }}
-                        >
-                          {status === 'done' ? 'Done' : 'Upcoming'}
-                        </span>
                       </div>
                       {isEditListMode && (
                         <div className={styles.cardActions}>
