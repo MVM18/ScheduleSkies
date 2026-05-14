@@ -235,6 +235,11 @@ const MyEvents = () => {
     return 'upcoming';
   };
 
+  const upcomingOrOngoingEvents = eventData.filter(e => {
+    const status = getEventStatus(e);
+    return status === 'upcoming' || status === 'ongoing';
+  });
+
   const statusCounts = {
     Ongoing: eventData.filter(e => getEventStatus(e) === 'ongoing').length,
     Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
@@ -333,8 +338,22 @@ const MyEvents = () => {
     setShowAiPanel(true);
     setAiSuggestions([]);
 
+    const targetEvents = upcomingOrOngoingEvents;
+    if (targetEvents.length === 0) {
+      setAiSuggestions([
+        {
+          type: 'warning',
+          icon: '⚠️',
+          title: 'No active events to analyze',
+          message: 'AI suggestions are only generated for upcoming and ongoing events. Create or activate an event to get itinerary recommendations.',
+        },
+      ]);
+      setIsAiLoading(false);
+      return;
+    }
+
     try {
-      const conflicts = detectScheduleConflicts(eventData);
+      const conflicts = detectScheduleConflicts(targetEvents);
       const { lat, lon } = await getLocationWithFallback();
       const weatherCtx = await buildWeatherContext(lat, lon);
 
@@ -344,7 +363,14 @@ const MyEvents = () => {
         body: JSON.stringify({
           message: 'Analyze my itinerary. Check for conflicts, suggest weather-based adjustments, and recommend improvements. Be specific about each event.',
           context: {
-            events: eventData.map(e => ({ title: e.title, location: e.location, date: e.date, category: e.category, price: e.price })),
+            events: targetEvents.map(e => ({
+              title: e.title,
+              location: e.location,
+              date: e.date,
+              category: e.category,
+              price: e.price,
+              status: getEventStatus(e),
+            })),
             weather: weatherCtx,
             location: userLocation,
             conflicts,
@@ -1394,14 +1420,17 @@ const MyEvents = () => {
             >
               <span style={{ fontSize: '14px', color: '#76b5d9' }}>✎</span> {isEditListMode ? 'Done' : 'Edit'}
             </button>
-            <button
-              className={styles.actionBtn}
-              onClick={handleAiAnalysis}
-              disabled={isAiLoading}
-              style={{ background: isAiLoading ? 'rgba(102, 126, 234, 0.15)' : undefined }}
-            >
-              <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <button
+                className={styles.actionBtn}
+                onClick={handleAiAnalysis}
+                disabled={isAiLoading}
+                style={{ background: isAiLoading ? 'rgba(102, 126, 234, 0.15)' : undefined }}
+              >
+                <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
+              </button>
+              
+            </div>
 
             {/* View toggle */}
             <div className={styles.viewToggle}>
