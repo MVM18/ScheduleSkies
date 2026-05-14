@@ -499,18 +499,27 @@ const findPlacesAlongRoute = async (routeCoords) => {
 
 const findPlacesNearPoint = async (lat, lng) => {
   try {
+    if (!GEOAPIFY_API_KEY) {
+  console.error('GEOAPIFY_API_KEY is not set');
+  return [];
+}
     const categories = [
-      'catering.restaurant',
-      'catering.cafe',
-      'parking',
-      'tourism.attraction',
-      'leisure.park',
-      'shopping.mall',
-      'accommodation.hotel',
-    ];
-    const url = `https://api.geoapify.com/v2/places?categories=${categories.join(',')}&filter=circle:${lng},${lat},1500&limit=20&apiKey=${GEOAPIFY_API_KEY}`;
+    'catering.restaurant',
+    'catering.cafe',
+    'parking',
+    'tourism.attraction',
+    'leisure.park',
+    'commercial.shopping_mall', 
+    'accommodation.hotel',
+  ];
+    const url = `https://api.geoapify.com/v2/places?categories=${categories.join(',')}&filter=circle:${lng},${lat},5000&limit=20&apiKey=${GEOAPIFY_API_KEY}`;
     const response = await fetch(url);
     const data = await response.json();
+
+    if (data.statusCode || data.message) {
+  console.error('Geoapify API error:', data.statusCode, data.message);
+  return [];
+}
 
     if (!data.features || data.features.length === 0) {
       console.warn('Geoapify returned no features for:', lat, lng);
