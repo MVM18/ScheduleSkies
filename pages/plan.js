@@ -22,7 +22,9 @@ import {
 } from '@/lib/itineraryImportShared';
 import EventGalleryHeader from '@/components/EventGalleryHeader'
 
-const MAP_PICK_STORAGE_KEY = 'scheduleSkies_mapPick';
+const MAP_PICK_KEY_EVENT = 'scheduleSkies_mapPick_event';
+const MAP_PICK_KEY_ACTIVITY = 'scheduleSkies_mapPick_activity';
+const MAP_PICK_LEGACY = 'scheduleSkies_mapPick';
 const PLAN_RESTORE_STORAGE_KEY = 'scheduleSkies_planRestore';
 
 const MyEvents = () => {
@@ -47,18 +49,70 @@ const MyEvents = () => {
     };
   };
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (currentUserId = userId) => {
+    if (!currentUserId) return;
     setLoading(true);
-    const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
-    if (data && !error) {
-      setEventData(data.map(generateDynamicProps));
+
+    const { data: ownedEvents, error: ownedError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('user_id', currentUserId);
+
+    if (ownedError) {
+      console.error('Failed to fetch owned events:', ownedError);
       setLoading(false);
+      return;
     }
+
+    // Pull events shared to this account (when collaborator is logged in).
+    const { data: collabRows, error: collabError } = await supabase
+      .from('share_collaborators')
+      .select('event_shares!inner(event_id)')
+      .eq('user_id', currentUserId);
+
+    if (collabError) {
+      console.error('Failed to fetch shared events:', collabError);
+    }
+
+    const sharedEventIds = Array.from(new Set(
+      (collabRows || [])
+        .map(row => Array.isArray(row?.event_shares) ? row.event_shares[0]?.event_id : row?.event_shares?.event_id)
+        .filter(Boolean)
+    ));
+
+    let sharedEvents = [];
+    if (sharedEventIds.length > 0) {
+      const { data: sharedData, error: sharedError } = await supabase
+        .from('events')
+        .select('*')
+        .in('id', sharedEventIds);
+
+      if (sharedError) {
+        console.error('Failed to load shared event rows:', sharedError);
+      } else {
+        sharedEvents = sharedData || [];
+      }
+    }
+
+    // Tag events with isShared property
+    const taggedOwnedEvents = (ownedEvents || []).map(ev => ({ ...ev, isShared: false }));
+    const taggedSharedEvents = (sharedEvents || []).map(ev => ({ ...ev, isShared: true }));
+
+    const mergedById = new Map();
+    [...taggedOwnedEvents, ...taggedSharedEvents].forEach(ev => mergedById.set(ev.id, ev));
+    const merged = Array.from(mergedById.values()).sort((a, b) => {
+      const aDate = a?.date || a?.start_datetime || '';
+      const bDate = b?.date || b?.start_datetime || '';
+      return aDate.localeCompare(bDate);
+    });
+
+    setEventData(merged.map(generateDynamicProps));
+    setLoading(false);
   };
 
   // --- 2. UI & LOCATION STATE ---
   const [activeFilter, setActiveFilter] = useState('All Events');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Upcoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState('Locating...');
   const [currentDate, setCurrentDate] = useState('');
@@ -136,6 +190,8 @@ const MyEvents = () => {
     return dt.includes('T') ? dt.split('T')[0] : dt;
   };
   const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+  /** 'all' | 'mine' | 'shared' — filter list by ownership */
+  const [ownershipFilter, setOwnershipFilter] = useState('all');
 
   // Helper to display 24h string (14:30) as 12h string (2:30 PM)
   const formatDisplayTime = (time24) => {
@@ -149,18 +205,49 @@ const MyEvents = () => {
 
   const getEventStatus = (event) => {
     const now = new Date();
-    const endDate = event.end_datetime ? new Date(event.end_datetime) : (event.date ? new Date(event.date + 'T23:59:59') : null);
-    const startDate = event.start_datetime ? new Date(event.start_datetime) : (event.date ? new Date(event.date + 'T00:00:00') : null);
-    if (!endDate && !startDate) return 'upcoming';
-    if (endDate && endDate < now) return 'done';
+
+    const startDate = event.start_datetime
+      ? new Date(event.start_datetime)
+      : (event.date ? new Date(event.date + 'T00:00:00') : null);
+
+    const endDate = event.end_datetime
+      ? new Date(event.end_datetime)
+      : (event.date ? new Date(event.date + 'T23:59:59') : null);
+
+    if (!startDate && !endDate) return 'upcoming';
+
+    // Event already finished
+    if (endDate && endDate < now) {
+      return 'done';
+    }
+
+    // Event currently happening
+    if (
+      startDate &&
+      endDate &&
+      startDate <= now &&
+      endDate >= now
+    ) {
+      return 'ongoing';
+    }
+
+    // Event not started yet
     return 'upcoming';
   };
 
+  const upcomingOrOngoingEvents = eventData.filter(e => {
+    const status = getEventStatus(e);
+    return status === 'upcoming' || status === 'ongoing';
+  });
+
   const statusCounts = {
-    All: eventData.length,
+    Ongoing: eventData.filter(e => getEventStatus(e) === 'ongoing').length,
     Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
     Done: eventData.filter(e => getEventStatus(e) === 'done').length,
   };
+
+  const sharedWithMeCount = eventData.filter(e => e.isShared).length;
+  const myEventsCount = eventData.filter(e => !e.isShared).length;
 
   const loadCompletedActivities = (eventId) => {
     try {
@@ -197,7 +284,7 @@ const MyEvents = () => {
         router.push('/');
       } else {
         setUserId(session.user.id);
-        fetchEvents();
+        fetchEvents(session.user.id);
       }
     };
     checkUser();
@@ -251,8 +338,22 @@ const MyEvents = () => {
     setShowAiPanel(true);
     setAiSuggestions([]);
 
+    const targetEvents = upcomingOrOngoingEvents;
+    if (targetEvents.length === 0) {
+      setAiSuggestions([
+        {
+          type: 'warning',
+          icon: '⚠️',
+          title: 'No active events to analyze',
+          message: 'AI suggestions are only generated for upcoming and ongoing events. Create or activate an event to get itinerary recommendations.',
+        },
+      ]);
+      setIsAiLoading(false);
+      return;
+    }
+
     try {
-      const conflicts = detectScheduleConflicts(eventData);
+      const conflicts = detectScheduleConflicts(targetEvents);
       const { lat, lon } = await getLocationWithFallback();
       const weatherCtx = await buildWeatherContext(lat, lon);
 
@@ -262,7 +363,14 @@ const MyEvents = () => {
         body: JSON.stringify({
           message: 'Analyze my itinerary. Check for conflicts, suggest weather-based adjustments, and recommend improvements. Be specific about each event.',
           context: {
-            events: eventData.map(e => ({ title: e.title, location: e.location, date: e.date, category: e.category, price: e.price })),
+            events: targetEvents.map(e => ({
+              title: e.title,
+              location: e.location,
+              date: e.date,
+              category: e.category,
+              price: e.price,
+              status: getEventStatus(e),
+            })),
             weather: weatherCtx,
             location: userLocation,
             conflicts,
@@ -462,12 +570,14 @@ const MyEvents = () => {
     if (editingId) {
       const { data, error } = await supabase.from('events').update(newEventData).eq('id', editingId).select();
       if (data && !error) {
-        setEventData(prev => prev.map(ev => ev.id === editingId ? generateDynamicProps(data[0]) : ev));
+        setEventData(prev => prev.map(ev =>
+          ev.id === editingId ? { ...generateDynamicProps(data[0]), isShared: ev.isShared } : ev
+        ));
       }
     } else {
       const { data, error } = await supabase.from('events').insert([newEventData]).select();
       if (data && !error) {
-        const created = generateDynamicProps(data[0]);
+        const created = { ...generateDynamicProps(data[0]), isShared: false };
         setEventData(prev => [...prev, created]);
         setActiveFilter('All Events');
 
@@ -623,10 +733,25 @@ const MyEvents = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !userId) return;
-    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
-    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
-    if (!restoreRaw && !pickRaw) return;
 
+    const consumeTimedMapPick = (storageKey) => {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return null;
+      try {
+        const mapPick = JSON.parse(raw);
+        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
+          sessionStorage.removeItem(storageKey);
+          return null;
+        }
+        sessionStorage.removeItem(storageKey);
+        return mapPick;
+      } catch {
+        sessionStorage.removeItem(storageKey);
+        return null;
+      }
+    };
+
+    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
     if (restoreRaw) {
       try {
         const restore = JSON.parse(restoreRaw);
@@ -635,44 +760,7 @@ const MyEvents = () => {
           setFormData(restore.formDataSnapshot);
           setEditingId(restore.editingId ?? null);
           setIsFormOpen(true);
-        }
-      } catch {
-        sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
-      }
-    }
-
-    if (pickRaw) {
-      try {
-        const mapPick = JSON.parse(pickRaw);
-        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          return;
-        }
-        if (mapPick.context !== 'activity') {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          setFormData(prev => ({
-            ...prev,
-            location: mapPick.label || prev.location,
-            latitude: mapPick.lat,
-            longitude: mapPick.lng,
-          }));
-        }
-      } catch {
-        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-      }
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !userId || eventData.length === 0) return;
-    const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
-    const pickRaw = sessionStorage.getItem(MAP_PICK_STORAGE_KEY);
-    if (!restoreRaw && !pickRaw) return;
-
-    if (restoreRaw) {
-      try {
-        const restore = JSON.parse(restoreRaw);
-        if (restore.type === 'activity' && restore.itineraryEventId) {
+        } else if (restore.type === 'activity' && restore.itineraryEventId && eventData.length > 0) {
           const ev = eventData.find(e => e.id === restore.itineraryEventId);
           if (ev) {
             sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
@@ -689,24 +777,42 @@ const MyEvents = () => {
       }
     }
 
-    if (pickRaw) {
-      try {
-        const mapPick = JSON.parse(pickRaw);
-        if (Date.now() - mapPick.ts > 10 * 60 * 1000) {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          return;
-        }
-        if (mapPick.context === 'activity') {
-          sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
-          setActivityForm(prev => ({
-            ...prev,
-            location: mapPick.label || prev.location,
-            latitude: mapPick.lat,
-            longitude: mapPick.lng,
-          }));
-        }
-      } catch {
-        sessionStorage.removeItem(MAP_PICK_STORAGE_KEY);
+    const actPick = consumeTimedMapPick(MAP_PICK_KEY_ACTIVITY);
+    if (actPick?.context === 'activity') {
+      setActivityForm(prev => ({
+        ...prev,
+        location: actPick.label || prev.location,
+        latitude: actPick.lat,
+        longitude: actPick.lng,
+      }));
+    }
+
+    const evtPick = consumeTimedMapPick(MAP_PICK_KEY_EVENT);
+    if (evtPick?.context === 'event') {
+      setFormData(prev => ({
+        ...prev,
+        location: evtPick.label || prev.location,
+        latitude: evtPick.lat,
+        longitude: evtPick.lng,
+      }));
+    }
+
+    const legacyPick = consumeTimedMapPick(MAP_PICK_LEGACY);
+    if (legacyPick) {
+      if (legacyPick.context === 'activity') {
+        setActivityForm(prev => ({
+          ...prev,
+          location: legacyPick.label || prev.location,
+          latitude: legacyPick.lat,
+          longitude: legacyPick.lng,
+        }));
+      } else if (legacyPick.context !== 'shared-activity') {
+        setFormData(prev => ({
+          ...prev,
+          location: legacyPick.label || prev.location,
+          latitude: legacyPick.lat,
+          longitude: legacyPick.lng,
+        }));
       }
     }
   }, [userId, eventData]);
@@ -866,7 +972,11 @@ const MyEvents = () => {
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || getEventStatus(event) === statusFilter.toLowerCase();
-    return matchesCategory && matchesSearch && matchesStatus;
+    const matchesOwnership =
+      ownershipFilter === 'all' ||
+      (ownershipFilter === 'mine' && !event.isShared) ||
+      (ownershipFilter === 'shared' && event.isShared);
+    return matchesCategory && matchesSearch && matchesStatus && matchesOwnership;
   });
 
   // --- 7. NEW CALENDAR LOGIC (date-fns & framer-motion) ---
@@ -944,7 +1054,9 @@ const MyEvents = () => {
 
     const { data, error } = await supabase.from('events').update(updateData).eq('id', event.id).select();
     if (data && !error) {
-      setEventData(prev => prev.map(ev => ev.id === event.id ? generateDynamicProps(data[0]) : ev));
+      setEventData(prev => prev.map(ev =>
+        ev.id === event.id ? { ...generateDynamicProps(data[0]), isShared: ev.isShared } : ev
+      ));
     }
   };
 
@@ -1230,14 +1342,51 @@ const MyEvents = () => {
 
         {/* Status Filter Tabs */}
         <div className={styles.statusFilterBar}>
-          {['All', 'Upcoming', 'Done'].map(status => (
+          {['Ongoing', 'Upcoming', 'Done'].map(status => (
             <button
               key={status}
               className={`${styles.statusBtn} ${statusFilter === status ? styles.statusBtnActive : ''}`}
               onClick={() => setStatusFilter(status)}
             >
-              {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
+              {status === 'Ongoing'} {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
               <span className={styles.statusCount}>{statusCounts[status]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Ownership filter (owned vs shared with me) */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center',
+            marginBottom: '12px',
+          }}
+        >
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#1a365d', marginRight: '4px' }}>Events:</span>
+          {[
+            { key: 'all', label: 'All', count: eventData.length },
+            { key: 'mine', label: 'My events', count: myEventsCount },
+            { key: 'shared', label: 'Shared with me', count: sharedWithMeCount },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setOwnershipFilter(key)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '999px',
+                border: ownershipFilter === key ? '2px solid #4396D1' : '1px solid #cbd5e1',
+                background: ownershipFilter === key ? '#E8F4FC' : '#fff',
+                color: '#334155',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+              <span style={{ marginLeft: '6px', opacity: 0.75, fontWeight: 700 }}>{count}</span>
             </button>
           ))}
         </div>
@@ -1271,14 +1420,17 @@ const MyEvents = () => {
             >
               <span style={{ fontSize: '14px', color: '#76b5d9' }}>✎</span> {isEditListMode ? 'Done' : 'Edit'}
             </button>
-            <button
-              className={styles.actionBtn}
-              onClick={handleAiAnalysis}
-              disabled={isAiLoading}
-              style={{ background: isAiLoading ? 'rgba(102, 126, 234, 0.15)' : undefined }}
-            >
-              <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <button
+                className={styles.actionBtn}
+                onClick={handleAiAnalysis}
+                disabled={isAiLoading}
+                style={{ background: isAiLoading ? 'rgba(102, 126, 234, 0.15)' : undefined }}
+              >
+                <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
+              </button>
+              
+            </div>
 
             {/* View toggle */}
             <div className={styles.viewToggle}>
@@ -1357,7 +1509,15 @@ const MyEvents = () => {
             <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
               {filteredEvents.length === 0 ? (
                 <div className={styles.emptyState}>
-                  {statusFilter === 'Done' ? 'No completed events yet.' : statusFilter === 'Upcoming' ? 'No upcoming events. Click "Add" to create one!' : 'No events found. Click "Add" to create one!'}
+                  {ownershipFilter === 'shared' && sharedWithMeCount === 0
+                    ? 'Nothing has been shared with you yet. When someone adds you as a collaborator, their event will appear here.'
+                    : ownershipFilter === 'mine' && myEventsCount === 0
+                      ? 'You have no events you own yet. Click "Add" to create one.'
+                      : statusFilter === 'Done'
+                        ? 'No completed events yet.'
+                        : statusFilter === 'Upcoming'
+                          ? 'No upcoming events. Click "Add" to create one!'
+                          : 'No events match these filters.'}
                 </div>
               ) : viewMode === 'grid' ? (
                 // ── GRID VIEW (existing) ──────────────────────────────────────────────
@@ -1377,6 +1537,7 @@ const MyEvents = () => {
                           <p>{event.title}</p>
                         </div>
                       </span>
+                      
                       <span
                         className={styles.cardStatusBadge}
                         style={{
@@ -1387,6 +1548,23 @@ const MyEvents = () => {
                       >
                         {status === 'done' ? 'Done' : 'Upcoming'}
                       </span>
+
+                      <div style={{ display: 'flex', gap: '6px', position: 'absolute', bottom: '12px', left: '12px', right: '12px', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                        {event.isShared && (
+                          <span style={{
+                            background: 'rgba(100, 116, 139, 0.95)',
+                            color: '#fff',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                            backdropFilter: 'blur(8px)',
+                          }}>
+                            Shared with me
+                          </span>
+                        )}
+                      </div>
                       {isEditListMode && (
                         <div className={styles.cardActions}>
                           <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
@@ -1438,18 +1616,33 @@ const MyEvents = () => {
 
                       {/* Status + actions */}
                       <div className={styles.listRight}>
-                        <span
-                          className={styles.cardStatusBadge}
-                          style={{
-                            background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                            color: status === 'done' ? '#15A862' : '#4396D1',
-                            border: '0.5px solid black',
-                            position: 'static',
-                            marginBottom: isEditListMode ? '8px' : '0'
-                          }}
-                        >
-                          {status === 'done' ? 'Done' : 'Upcoming'}
-                        </span>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: isEditListMode ? '8px' : '0' }}>
+                          {event.isShared && (
+                            <span style={{
+                              background: 'rgba(100, 116, 139, 0.95)',
+                              color: '#fff',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              Shared with me
+                            </span>
+                          )}
+                          <span
+                            className={styles.cardStatusBadge}
+                            style={{
+                              background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                              color: status === 'done' ? '#15A862' : '#4396D1',
+                              border: '0.5px solid black',
+                              position: 'static',
+                            }}
+                          >
+                            {status === 'done' ? 'Done' : 'Upcoming'}
+                          </span>
+                        </div>
                         {isEditListMode && (
                           <div className={styles.listActions}>
                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>

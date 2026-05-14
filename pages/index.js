@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -58,8 +58,29 @@ export default function Home() {
   const [accountGateOpen, setAccountGateOpen] = useState(false)
   const [showcaseIndex, setShowcaseIndex] = useState(0)
   const [activeSlot, setActiveSlot] = useState(null)
+  const showcaseTouchRef = useRef({ x: 0, y: 0 })
 
   const closeSlotModal = () => setActiveSlot(null)
+
+  const onShowcaseTouchStart = (e) => {
+    const t = e.changedTouches?.[0] || e.touches?.[0]
+    if (!t) return
+    showcaseTouchRef.current = { x: t.clientX, y: t.clientY }
+  }
+
+  const onShowcaseTouchEnd = (e) => {
+    const t = e.changedTouches?.[0]
+    if (!t) return
+    const { x: sx, y: sy } = showcaseTouchRef.current
+    const dx = t.clientX - sx
+    const dy = t.clientY - sy
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return
+    if (dx < 0) {
+      setShowcaseIndex((prev) => (prev === SHOWCASE_CARDS.length - 1 ? 0 : prev + 1))
+    } else {
+      setShowcaseIndex((prev) => (prev === 0 ? SHOWCASE_CARDS.length - 1 : prev - 1))
+    }
+  }
 
   useEffect(() => {
     if (!activeSlot) return
@@ -220,10 +241,18 @@ export default function Home() {
             </div>
           </div>
           <div className={styles.heroCard}>
-            <div className={styles.showcaseViewport}>
+            <div
+              className={styles.showcaseViewport}
+              role="region"
+              aria-roledescription="carousel"
+              aria-label="Product highlights"
+              onTouchStart={onShowcaseTouchStart}
+              onTouchEnd={onShowcaseTouchEnd}
+            >
               <ul
                 className={styles.showcaseTrack}
                 style={{ transform: `translateX(-${showcaseIndex * 100}%)` }}
+                aria-live="polite"
               >
                 {SHOWCASE_CARDS.map((card, idx) => (
                   <li key={card.title} className={`${styles.showcaseItem} ${idx === 0 ? styles.showcaseIntro : ''}`}>

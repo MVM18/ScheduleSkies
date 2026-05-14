@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabaseClient';
+import TimeKeeper from 'react-timekeeper';
+import { Clock } from 'lucide-react';
 import styles from '../../styles/share.module.css';
 import eventStyles from '../../styles/event.module.css';
 
@@ -23,6 +25,8 @@ const formatDateRange = (start, end) => {
 };
 
 const initialActivityForm = { activity_name: '', description: '', start_time: '', end_time: '', location: '' };
+const MAP_PICK_SHARED_ACTIVITY_KEY = 'scheduleSkies_mapPick_shared-activity';
+const SHARED_RESTORE_STORAGE_KEY = 'scheduleSkies_sharedRestore';
 
 export default function SharedEventPage() {
   const router = useRouter();
@@ -36,11 +40,18 @@ export default function SharedEventPage() {
   const [activities, setActivities] = useState([]);
   const [completedActivities, setCompletedActivities] = useState({});
   const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
-  const [activityForm, setActivityForm] = useState(initialActivityForm);
+  const [activityForm, setActivityForm] = useState({ ...initialActivityForm, latitude: null, longitude: null });
   const [editingActivityId, setEditingActivityId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [isLive, setIsLive] = useState(false);
+  const [showActStartClock, setShowActStartClock] = useState(false);
+  const [showActEndClock, setShowActEndClock] = useState(false);
+  const [locationResults, setLocationResults] = useState([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [signedInUser, setSignedInUser] = useState(null);
+  const [isAddingToMyEvents, setIsAddingToMyEvents] = useState(false);
+  const [addToMyEventsMsg, setAddToMyEventsMsg] = useState('');
 
   const isEditRole = data?.share?.role === 'edit';
 
@@ -62,6 +73,65 @@ export default function SharedEventPage() {
   }, [token]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setSignedInUser(data?.session?.user || null);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !token) return;
+    const restoreRaw = sessionStorage.getItem(SHARED_RESTORE_STORAGE_KEY);
+    const pickNewRaw = sessionStorage.getItem(MAP_PICK_SHARED_ACTIVITY_KEY);
+    const pickLegacyRaw = sessionStorage.getItem('scheduleSkies_mapPick');
+    if (!restoreRaw && !pickNewRaw && !pickLegacyRaw) return;
+
+    if (restoreRaw) {
+      try {
+        const restore = JSON.parse(restoreRaw);
+        if (restore?.type === 'shared-activity' && restore?.token === token) {
+          setActivityForm(restore.activityFormSnapshot || { ...initialActivityForm, latitude: null, longitude: null });
+          setEditingActivityId(restore.editingActivityId ?? null);
+          setIsActivityFormOpen(true);
+          sessionStorage.removeItem(SHARED_RESTORE_STORAGE_KEY);
+        }
+      } catch {
+        sessionStorage.removeItem(SHARED_RESTORE_STORAGE_KEY);
+      }
+    }
+
+    const consumePick = (raw, storageKey) => {
+      if (!raw) return;
+      try {
+        const pick = JSON.parse(raw);
+        if (Date.now() - pick.ts > 10 * 60 * 1000) {
+          sessionStorage.removeItem(storageKey);
+          return;
+        }
+        const ok =
+          pick.context === 'shared-activity' ||
+          (storageKey === 'scheduleSkies_mapPick' && pick.context === 'activity');
+        if (ok) {
+          setActivityForm(prev => ({
+            ...prev,
+            location: pick.label || prev.location,
+            latitude: pick.lat,
+            longitude: pick.lng,
+          }));
+          setIsActivityFormOpen(true);
+          sessionStorage.removeItem(storageKey);
+        }
+      } catch {
+        sessionStorage.removeItem(storageKey);
+      }
+    };
+
+    consumePick(pickNewRaw, MAP_PICK_SHARED_ACTIVITY_KEY);
+    consumePick(pickLegacyRaw, 'scheduleSkies_mapPick');
+  }, [token]);
 
   // Real-time subscription
   useEffect(() => {
@@ -128,11 +198,95 @@ export default function SharedEventPage() {
     setGuestSubmitted(true);
     if (!data?.share?.id) return;
     try {
-      await supabase.from('share_collaborators').insert([{
-        share_id: data.share.id,
-        guest_label: guestName.trim(),
-      }]);
+      let currentUserId = null;
+      const { data: sessionData } = await supabase.auth.getSession();
+      currentUserId = sessionData?.session?.user?.id || null;
+
+      if (currentUserId) {
+        const { data: existing } = await supabase
+          .from('share_collaborators')
+          .select('id')
+          .eq('share_id', data.share.id)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('share_collaborators').insert([{
+            share_id: data.share.id,
+            user_id: currentUserId,
+            guest_label: guestName.trim(),
+          }]);
+        }
+      } else {
+        await supabase.from('share_collaborators').insert([{
+          share_id: data.share.id,
+          guest_label: guestName.trim(),
+        }]);
+      }
     } catch { /* ignore */ }
+  };
+
+  const getTimePart = (dt) => dt && dt.includes('T') ? dt.split('T')[1].substring(0, 5) : '12:00';
+  const getDatePart = (dt) => dt && dt.includes('T') ? dt.split('T')[0] : new Date().toISOString().split('T')[0];
+  const formatDisplayTime = (time24) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':');
+    const hours = parseInt(h, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${m} ${ampm}`;
+  };
+
+  const handleActivityLocationSearch = async (val) => {
+    setActivityForm({ ...activityForm, location: val });
+    if (val.length > 2) {
+      setIsSearchingLocation(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=5`);
+        const locData = await res.json();
+        setLocationResults(locData || []);
+      } catch {
+        setLocationResults([]);
+      } finally {
+        setIsSearchingLocation(false);
+      }
+    } else {
+      setLocationResults([]);
+    }
+  };
+
+  const handleSelectActivityLocation = (loc) => {
+    const lat = loc?.lat != null ? parseFloat(loc.lat) : null;
+    const lng = loc?.lon != null ? parseFloat(loc.lon) : null;
+    setActivityForm({
+      ...activityForm,
+      location: loc.display_name || activityForm.location,
+      latitude: Number.isNaN(lat) ? null : lat,
+      longitude: Number.isNaN(lng) ? null : lng,
+    });
+    setLocationResults([]);
+  };
+
+  const openMapPickerForActivity = () => {
+    if (!token) return;
+    try {
+      sessionStorage.setItem(SHARED_RESTORE_STORAGE_KEY, JSON.stringify({
+        type: 'shared-activity',
+        token,
+        activityFormSnapshot: activityForm,
+        editingActivityId,
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+
+    const params = new URLSearchParams({ pick: '1', from: 'shared-activity', returnTo: `/shared/${token}` });
+    if (activityForm.latitude != null && activityForm.longitude != null) {
+      params.set('lat', String(activityForm.latitude));
+      params.set('lng', String(activityForm.longitude));
+    }
+    if (activityForm.location) params.set('label', activityForm.location);
+    router.push(`/map?${params.toString()}`);
   };
 
   // Navigation
@@ -161,6 +315,74 @@ export default function SharedEventPage() {
     }
   };
 
+  const handleAddToMyEvents = async () => {
+    if (!signedInUser || !ev) return;
+    setIsAddingToMyEvents(true);
+    setAddToMyEventsMsg('');
+
+    try {
+      const { data: existing } = await supabase
+        .from('events')
+        .select('id')
+        .eq('user_id', signedInUser.id)
+        .eq('title', ev.title || '')
+        .eq('location', ev.location || '')
+        .eq('start_datetime', ev.start_datetime || null)
+        .eq('end_datetime', ev.end_datetime || null)
+        .limit(1);
+
+      let targetEventId = existing?.[0]?.id || null;
+
+      if (!targetEventId) {
+        const { data: insertedEvent, error: insertEventError } = await supabase
+          .from('events')
+          .insert([{
+            title: ev.title || 'Shared Event',
+            location: ev.location || '',
+            price: ev.price || '',
+            date: ev.date || (ev.start_datetime ? ev.start_datetime.split('T')[0] : new Date().toISOString().split('T')[0]),
+            category: ev.category || 'Leisure',
+            user_id: signedInUser.id,
+            venue: ev.venue || null,
+            start_datetime: ev.start_datetime || null,
+            end_datetime: ev.end_datetime || null,
+            latitude: ev.latitude || null,
+            longitude: ev.longitude || null,
+            image_link: ev.image_link || null,
+          }])
+          .select()
+          .single();
+
+        if (insertEventError || !insertedEvent) throw new Error('Failed to add event to your account.');
+        targetEventId = insertedEvent.id;
+
+        if (activities.length > 0) {
+          const payload = activities.map((a, index) => ({
+            event_id: targetEventId,
+            user_id: signedInUser.id,
+            activity_name: a.activity_name,
+            description: a.description || null,
+            start_time: a.start_time || null,
+            end_time: a.end_time || null,
+            location: a.location || null,
+            latitude: a.latitude || null,
+            longitude: a.longitude || null,
+            sort_order: a.sort_order ?? index,
+          }));
+          await supabase.from('itinerary_activities').insert(payload);
+        }
+
+        setAddToMyEventsMsg('Added to your account. You can now view/edit it in My Events.');
+      } else {
+        setAddToMyEventsMsg('This shared event is already in your account.');
+      }
+    } catch (err) {
+      setAddToMyEventsMsg(err.message || 'Unable to add this event right now.');
+    } finally {
+      setIsAddingToMyEvents(false);
+    }
+  };
+
   // Activity CRUD (edit role only)
   const handleOpenActivityForm = (activity = null) => {
     if (activity) {
@@ -176,12 +398,15 @@ export default function SharedEventPage() {
         start_time: toLocal(activity.start_time),
         end_time: toLocal(activity.end_time),
         location: activity.location || '',
+        latitude: activity.latitude || null,
+        longitude: activity.longitude || null,
       });
       setEditingActivityId(activity.id);
     } else {
-      setActivityForm(initialActivityForm);
+      setActivityForm({ ...initialActivityForm, latitude: null, longitude: null });
       setEditingActivityId(null);
     }
+    setLocationResults([]);
     setFormError('');
     setIsActivityFormOpen(true);
   };
@@ -191,11 +416,20 @@ export default function SharedEventPage() {
     setIsSaving(true);
     setFormError('');
     try {
+      const start = new Date(activityForm.start_time);
+      const end = new Date(activityForm.end_time);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        throw new Error('Please provide valid start and end date/time.');
+      }
+      if (end <= start) {
+        throw new Error('End time must be after start time.');
+      }
+
       const method = editingActivityId ? 'PUT' : 'POST';
       const body = {
         ...activityForm,
-        start_time: new Date(activityForm.start_time).toISOString(),
-        end_time: new Date(activityForm.end_time).toISOString(),
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
         ...(editingActivityId ? { id: editingActivityId } : {}),
       };
       const res = await fetch(`/api/share/activity?token=${token}`, {
@@ -212,7 +446,8 @@ export default function SharedEventPage() {
       }
       setIsActivityFormOpen(false);
       setEditingActivityId(null);
-      setActivityForm(initialActivityForm);
+      setActivityForm({ ...initialActivityForm, latitude: null, longitude: null });
+      setLocationResults([]);
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -271,7 +506,8 @@ export default function SharedEventPage() {
         {/* Navbar */}
         <nav className={styles.sharedNav}>
           <div className={styles.sharedNavBrand}>
-            ✈️ ScheduleSkies
+            <img src="/images/logo.png" alt="ScheduleSkies logo" style={{ height: '36px', width: 'auto' }} />
+            <span>ScheduleSkies</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {isLive && (
@@ -378,7 +614,17 @@ export default function SharedEventPage() {
                 🗺️ Navigate Full Itinerary
               </button>
             )}
+            {signedInUser && (
+              <button className={`${styles.navActionBtn} ${styles.navBtnSecondary}`} onClick={handleAddToMyEvents} disabled={isAddingToMyEvents}>
+                {isAddingToMyEvents ? '⏳ Adding...' : '➕ Add to My Events'}
+              </button>
+            )}
           </div>
+          {addToMyEventsMsg && (
+            <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+              {addToMyEventsMsg}
+            </div>
+          )}
 
           {/* Activities / Timeline */}
           <div className={styles.sharedTimeline}>
@@ -484,13 +730,93 @@ export default function SharedEventPage() {
                         </div>
                         <div>
                           <label>Start Time *</label>
-                          <input required type="datetime-local" value={activityForm.start_time}
-                            onChange={e => setActivityForm({ ...activityForm, start_time: e.target.value })} />
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              required
+                              type="date"
+                              style={{ flex: 1.5 }}
+                              value={getDatePart(activityForm.start_time)}
+                              onChange={e => {
+                                const timePart = getTimePart(activityForm.start_time);
+                                setActivityForm({ ...activityForm, start_time: `${e.target.value}T${timePart}` });
+                              }}
+                            />
+                            <div style={{ position: 'relative', flex: 1 }}>
+                              <input
+                                required
+                                type="text"
+                                readOnly
+                                style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                                value={formatDisplayTime(getTimePart(activityForm.start_time))}
+                                onClick={() => setShowActStartClock(true)}
+                                placeholder="Time"
+                              />
+                              <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                              {showActStartClock && (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActStartClock(false)} />
+                                  <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                    <TimeKeeper
+                                      time={getTimePart(activityForm.start_time)}
+                                      onChange={(clockData) => {
+                                        const datePart = getDatePart(activityForm.start_time) || new Date().toISOString().split('T')[0];
+                                        const hh = String(clockData.hour).padStart(2, '0');
+                                        const mm = String(clockData.minute).padStart(2, '0');
+                                        setActivityForm({ ...activityForm, start_time: `${datePart}T${hh}:${mm}` });
+                                      }}
+                                      onDoneClick={() => setShowActStartClock(false)}
+                                      switchToMinuteOnHourSelect
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div>
                           <label>End Time *</label>
-                          <input required type="datetime-local" value={activityForm.end_time}
-                            onChange={e => setActivityForm({ ...activityForm, end_time: e.target.value })} />
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              required
+                              type="date"
+                              style={{ flex: 1.5 }}
+                              value={getDatePart(activityForm.end_time)}
+                              onChange={e => {
+                                const timePart = getTimePart(activityForm.end_time);
+                                setActivityForm({ ...activityForm, end_time: `${e.target.value}T${timePart}` });
+                              }}
+                            />
+                            <div style={{ position: 'relative', flex: 1 }}>
+                              <input
+                                required
+                                type="text"
+                                readOnly
+                                style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
+                                value={formatDisplayTime(getTimePart(activityForm.end_time))}
+                                onClick={() => setShowActEndClock(true)}
+                                placeholder="Time"
+                              />
+                              <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                              {showActEndClock && (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActEndClock(false)} />
+                                  <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
+                                    <TimeKeeper
+                                      time={getTimePart(activityForm.end_time)}
+                                      onChange={(clockData) => {
+                                        const datePart = getDatePart(activityForm.end_time) || getDatePart(activityForm.start_time) || new Date().toISOString().split('T')[0];
+                                        const hh = String(clockData.hour).padStart(2, '0');
+                                        const mm = String(clockData.minute).padStart(2, '0');
+                                        setActivityForm({ ...activityForm, end_time: `${datePart}T${hh}:${mm}` });
+                                      }}
+                                      onDoneClick={() => setShowActEndClock(false)}
+                                      switchToMinuteOnHourSelect
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className={eventStyles.fullWidth}>
                           <label>Description</label>
@@ -501,8 +827,46 @@ export default function SharedEventPage() {
                         <div className={eventStyles.fullWidth}>
                           <label>Location</label>
                           <input type="text" value={activityForm.location}
-                            onChange={e => setActivityForm({ ...activityForm, location: e.target.value })}
+                            onChange={e => handleActivityLocationSearch(e.target.value)}
                             placeholder="e.g. Main Hall" />
+                          {activityForm.latitude && activityForm.longitude && (
+                            <div style={{ fontSize: '10px', color: '#15A862', marginTop: '4px', fontWeight: 600 }}>
+                              ✅ Coordinates captured — navigation enabled
+                            </div>
+                          )}
+                          {isSearchingLocation && (
+                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Searching…</div>
+                          )}
+                          {locationResults.length > 0 && (
+                            <div style={{ marginTop: '6px', border: '1px solid #e2e8f0', borderRadius: '8px', maxHeight: '140px', overflowY: 'auto', background: '#fff' }}>
+                              {locationResults.map((loc, i) => (
+                                <div
+                                  key={`${loc.display_name}-${i}`}
+                                  onClick={() => handleSelectActivityLocation(loc)}
+                                  style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: i < locationResults.length - 1 ? '1px solid #f1f5f9' : 'none', fontSize: '12px' }}
+                                >
+                                  📍 {loc.display_name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={openMapPickerForActivity}
+                            style={{
+                              marginTop: '8px',
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              borderRadius: '8px',
+                              border: '1px solid #2C5282',
+                              background: 'white',
+                              color: '#2C5282',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            🗺️ Pick on map
+                          </button>
                         </div>
                       </div>
                       {formError && (
@@ -510,7 +874,7 @@ export default function SharedEventPage() {
                       )}
                       <div className={eventStyles.activityFormFooter}>
                         <button type="button" className={eventStyles.btnCancel}
-                          onClick={() => { setIsActivityFormOpen(false); setEditingActivityId(null); setActivityForm(initialActivityForm); }}>
+                          onClick={() => { setIsActivityFormOpen(false); setEditingActivityId(null); setActivityForm({ ...initialActivityForm, latitude: null, longitude: null }); }}>
                           Cancel
                         </button>
                         <button type="submit" className={eventStyles.btnSave} disabled={isSaving}>

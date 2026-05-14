@@ -1,8 +1,11 @@
 // pages/api/share/activity.js
 // POST/PUT/DELETE — collaborator modifies activities via share token (edit role only)
-import { supabase } from '../../../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
-async function verifyShareToken(token) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+async function verifyShareToken(supabase, token) {
   if (!token) return null;
   const { data: share, error } = await supabase
     .from('event_shares')
@@ -16,8 +19,15 @@ async function verifyShareToken(token) {
 }
 
 export default async function handler(req, res) {
+  if (!supabaseUrl || !serviceRoleKey) {
+    return res.status(500).json({
+      error: 'Missing Supabase server credentials. Set SUPABASE_SERVICE_ROLE_KEY in .env.local.',
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { token } = req.query;
-  const share = await verifyShareToken(token);
+  const share = await verifyShareToken(supabase, token);
 
   if (!share) {
     return res.status(403).json({ error: 'Invalid token, expired, or view-only access' });
@@ -32,6 +42,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'activity_name, start_time, end_time required' });
     }
 
+    const start = new Date(start_time);
+    const end = new Date(end_time);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(400).json({ error: 'Invalid start_time or end_time' });
+    }
+    if (end <= start) {
+      return res.status(400).json({ error: 'end_time must be after start_time' });
+    }
+
     const { data, error } = await supabase
       .from('itinerary_activities')
       .insert([{
@@ -39,8 +58,8 @@ export default async function handler(req, res) {
         user_id: share.owner_id, // attributed to owner for RLS; collaborator tracked via share
         activity_name,
         description: description || null,
-        start_time: new Date(start_time).toISOString(),
-        end_time: new Date(end_time).toISOString(),
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
         location: location || null,
         latitude: latitude || null,
         longitude: longitude || null,
@@ -75,8 +94,16 @@ export default async function handler(req, res) {
     const updates = {};
     if (activity_name !== undefined) updates.activity_name = activity_name;
     if (description !== undefined) updates.description = description;
-    if (start_time !== undefined) updates.start_time = new Date(start_time).toISOString();
-    if (end_time !== undefined) updates.end_time = new Date(end_time).toISOString();
+    if (start_time !== undefined) {
+      const parsed = new Date(start_time);
+      if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid start_time' });
+      updates.start_time = parsed.toISOString();
+    }
+    if (end_time !== undefined) {
+      const parsed = new Date(end_time);
+      if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: 'Invalid end_time' });
+      updates.end_time = parsed.toISOString();
+    }
     if (location !== undefined) updates.location = location;
     if (latitude !== undefined) updates.latitude = latitude;
     if (longitude !== undefined) updates.longitude = longitude;

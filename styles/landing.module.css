@@ -42,6 +42,12 @@
   align-items: start;
 }
 
+/* Prevents grid children (esp. carousel) from forcing horizontal page scroll */
+.heroText,
+.heroCard {
+  min-width: 0;
+}
+
 .heroText h1 {
   font-size: clamp(2rem, 4vw, 3.1rem);
   margin: 0.2rem 0 0.9rem;
@@ -87,6 +93,9 @@
 .showcaseViewport {
   overflow: hidden;
   border-radius: 12px;
+  width: 100%;
+  max-width: 100%;
+  touch-action: pan-y pinch-zoom;
 }
 
 .heroCard .showcaseTrack {
@@ -94,9 +103,11 @@
   gap: 0;
   padding: 0;
   margin: 0;
+  width: 100%;
   transform: translateX(0);
   transition: transform 320ms ease;
   list-style: none;
+  will-change: transform;
 }
 
 .heroCard .showcaseTrack li {
@@ -136,6 +147,10 @@
 .heroCard .showcaseItem {
   list-style: none;
   flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   background: linear-gradient(180deg, rgba(32, 48, 88, 0.85), rgba(22, 33, 62, 0.8));
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 12px;
@@ -155,16 +170,21 @@
 
 .showcaseTitle {
   margin-top: 0.35rem;
-  font-size: 1.15rem;
+  font-size: clamp(1rem, 4vw, 1.15rem);
   font-weight: 800;
   color: #f8fafc;
+  line-height: 1.25;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .showcaseDesc {
   margin: 0.4rem 0 0;
   color: #cbd5e1;
-  font-size: 0.9rem;
-  line-height: 1.4;
+  font-size: clamp(0.82rem, 3.2vw, 0.9rem);
+  line-height: 1.45;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .showcaseDots {
@@ -866,10 +886,79 @@
   }
 
   .heroCard {
-    justify-self: center;
+    justify-self: stretch;
+    max-width: 100%;
   }
 
   .features {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 1rem max(1rem, env(safe-area-inset-right)) 2rem max(1rem, env(safe-area-inset-left));
+    overflow-x: hidden;
+  }
+
+  .nav {
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+  }
+
+  .navActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .hero {
+    margin-top: 1.5rem;
+    gap: 1rem;
+  }
+
+  .heroText h1 {
+    font-size: clamp(1.45rem, 6.5vw, 2rem);
+  }
+
+  .subText {
+    font-size: 0.95rem;
+  }
+
+  .heroCard {
+    padding: 1rem 0.85rem;
+    border-radius: 14px;
+  }
+
+  .heroCard .showcaseItem {
+    padding: 0.85rem 0.75rem 0.8rem;
+  }
+
+  .showcaseControls {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .showcaseNavBtn {
+    min-height: 2.75rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
+
+  .showcaseCount {
+    flex: 0 0 100%;
+    order: -1;
+    text-align: center;
+    font-size: 0.72rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .showcaseDots {
+    flex-wrap: wrap;
+    padding: 0 0.25rem;
   }
 }

@@ -1,16 +1,28 @@
 // pages/api/share/get.js
 // GET ?token=xxx — public endpoint, returns full event + itinerary for a valid token
-import { supabase } from '../../../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!supabaseUrl || !serviceRoleKey) {
+    return res.status(500).json({
+      error: 'Missing Supabase server credentials. Set SUPABASE_SERVICE_ROLE_KEY in .env.local.',
+    });
+  }
+
   const { token } = req.query;
   if (!token) return res.status(400).json({ error: 'token is required' });
 
   try {
+    // Server-side client bypasses RLS; token validation below controls access.
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
     // 1. Fetch share record
     const { data: share, error: shareError } = await supabase
       .from('event_shares')
