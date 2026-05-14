@@ -1154,7 +1154,7 @@ const MapScreen = ({
       </div>
 
       {pickMode ? (
-        <div style={{ position: 'absolute', bottom: '20px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '14px 16px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)' }}>
+        <div style={{ position: 'absolute', top: '20px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '14px 16px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)' }}>
           <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', marginBottom: '8px' }}>📍 Pin your {isActivityPickContext(pickContext) ? 'activity' : 'event'} location</div>
           <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px', lineHeight: 1.45 }}>Tap anywhere on the map to place or move the pin.{pickHintLabel ? <span style={{ display: 'block', marginTop: '6px', fontSize: '11px', opacity: 0.85 }}>Hint: {pickHintLabel}</span> : null}</p>
           {pickLoading && <div style={{ fontSize: '11px', color: '#718096', marginBottom: '8px' }}>Resolving address…</div>}
