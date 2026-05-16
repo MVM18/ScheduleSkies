@@ -65,9 +65,6 @@ export default function ProfileEventCharts({ eventSummaries, themeMode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
-        <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: isDark ? '#e2e8f0' : '#1e293b' }}>
-          Upcoming vs completed
-        </h4>
         <div style={{ width: '100%', height: 260 }}>
           <ResponsiveContainer>
             <PieChart>

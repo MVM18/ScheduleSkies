@@ -392,8 +392,8 @@ const ProfilePage = () => {
                 </span>
 
                 <span>
-                  {eventSummaries.upcoming_count} upcoming ·{' '}
-                  {eventSummaries.ongoing_count} ongoing ·{' '}
+                  {eventSummaries.upcoming_count} upcoming ,{' '}
+                  {eventSummaries.ongoing_count} ongoing ,{' '}
                   {eventSummaries.past_count} completed
                 </span>
               </div>

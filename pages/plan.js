@@ -224,6 +224,11 @@ const MyEvents = () => {
     return 'upcoming';
   };
 
+  const upcomingOrOngoingEvents = eventData.filter(e => {
+    const status = getEventStatus(e);
+    return status === 'upcoming' || status === 'ongoing';
+  });
+
   const statusCounts = {
     Ongoing: eventData.filter(e => getEventStatus(e) === 'ongoing').length,
     Upcoming: eventData.filter(e => getEventStatus(e) === 'upcoming').length,
@@ -310,9 +315,26 @@ const MyEvents = () => {
 
   // --- AI ANALYSIS ---
   const handleAiAnalysis = async () => {
-    setIsAiLoading(true); setShowAiPanel(true); setAiSuggestions([]);
+    setIsAiLoading(true);
+    setShowAiPanel(true);
+    setAiSuggestions([]);
+
+    const targetEvents = upcomingOrOngoingEvents;
+    if (targetEvents.length === 0) {
+      setAiSuggestions([
+        {
+          type: 'warning',
+          icon: '⚠️',
+          title: 'No active events to analyze',
+          message: 'AI suggestions are only generated for upcoming and ongoing events. Create or activate an event to get itinerary recommendations.',
+        },
+      ]);
+      setIsAiLoading(false);
+      return;
+    }
+
     try {
-      const conflicts = detectScheduleConflicts(eventData);
+      const conflicts = detectScheduleConflicts(targetEvents);
       const { lat, lon } = await getLocationWithFallback();
       const weatherCtx = await buildWeatherContext(lat, lon);
 
@@ -321,8 +343,18 @@ const MyEvents = () => {
         body: JSON.stringify({
           message: 'Analyze my itinerary. Check for conflicts, suggest weather-based adjustments, and recommend improvements. Be specific about each event.',
           context: {
-            events: eventData.map(e => ({ title: e.title, location: e.location, date: e.date, category: e.category, price: e.price })),
-            weather: weatherCtx, location: userLocation, conflicts, currentWeather: { temp: temperature, description: 'Current', city: userLocation },
+            events: targetEvents.map(e => ({
+              title: e.title,
+              location: e.location,
+              date: e.date,
+              category: e.category,
+              price: e.price,
+              status: getEventStatus(e),
+            })),
+            weather: weatherCtx,
+            location: userLocation,
+            conflicts,
+            currentWeather: { temp: temperature, description: 'Current', city: userLocation },
           },
         }),
       });
