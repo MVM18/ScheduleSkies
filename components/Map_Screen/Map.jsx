@@ -18,46 +18,108 @@ const mapStyle = 'osm-bright';
 
 const isActivityPickContext = (ctx) => ctx === 'activity' || ctx === 'shared-activity';
 
-const createIcon = (color) => L.divIcon({
+const createPinIcon = (fillColor, borderColor = 'white', size = 28) => L.divIcon({
   className: '',
-  html: `<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:${color};border:2px solid white;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 18],
+  html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size * 1.3}" viewBox="0 0 28 36">
+    <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z"
+      fill="${fillColor}" stroke="${borderColor}" stroke-width="2"/>
+    <circle cx="14" cy="14" r="5" fill="white" opacity="0.9"/>
+  </svg>`,
+  iconSize: [size, size * 1.3],
+  iconAnchor: [size / 2, size * 1.3],
+  popupAnchor: [0, -(size * 1.3)],
 });
 
-const createHighlightedIcon = (color) => L.divIcon({
+const createPinIconHighlighted = (fillColor, size = 36) => L.divIcon({
   className: '',
-  html: `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;background:${color};border:3px solid #FFD700;transform:rotate(-45deg);box-shadow:0 0 0 2px white, 0 4px 12px rgba(0,0,0,0.5);transition: all 0.2s;"></div>`,
-  iconSize: [26, 26],
-  iconAnchor: [13, 26],
+  html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size * 1.3}" viewBox="0 0 28 36">
+    <filter id="glow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="${fillColor}" flood-opacity="0.5"/>
+    </filter>
+    <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z"
+      fill="${fillColor}" stroke="#FFD700" stroke-width="2.5" filter="url(#glow)"/>
+    <circle cx="14" cy="14" r="5" fill="white" opacity="0.95"/>
+  </svg>`,
+  iconSize: [size, size * 1.3],
+  iconAnchor: [size / 2, size * 1.3],
+  popupAnchor: [0, -(size * 1.3)],
 });
 
-const originIcon = createIcon('#2C5282');
-const originIconHighlight = createHighlightedIcon('#2C5282');
-const destIcon = createIcon('#E53E3E');
-const destIconHighlight = createHighlightedIcon('#E53E3E');
-const userLocationIcon = L.divIcon({
+const createDotIcon = (fillColor, size = 16) => L.divIcon({
   className: '',
-  html: `<div style="width:14px;height:14px;background:#2C5282;border:2px solid white;border-radius:50%;box-shadow:0 0 0 2px #2C5282;"></div>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
+  html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 16 16">
+    <circle cx="8" cy="8" r="6" fill="${fillColor}" stroke="white" stroke-width="2.5"/>
+    <circle cx="8" cy="8" r="2.5" fill="white" opacity="0.85"/>
+  </svg>`,
+  iconSize: [size, size],
+  iconAnchor: [size / 2, size / 2],
+  popupAnchor: [0, -(size / 2)],
 });
-const userLocationIconHighlight = L.divIcon({
+
+const createDotIconHighlighted = (fillColor, size = 22) => L.divIcon({
   className: '',
-  html: `<div style="width:20px;height:20px;background:#2C5282;border:3px solid #FFD700;border-radius:50%;box-shadow:0 0 0 2px white, 0 0 0 4px #2C5282;transition: all 0.2s;"></div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
+  html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 22 22">
+    <circle cx="11" cy="11" r="9" fill="${fillColor}" stroke="#FFD700" stroke-width="3"/>
+    <circle cx="11" cy="11" r="3.5" fill="white" opacity="0.9"/>
+  </svg>`,
+  iconSize: [size, size],
+  iconAnchor: [size / 2, size / 2],
+  popupAnchor: [0, -(size / 2)],
 });
-const getPlaceEmoji = (type) => {
-  switch (type) {
-    case 'restaurant': return '🍽️';
-    case 'parking': return '🅿️';
-    case 'attraction': return '🏛️';
-    case 'park': return '🌳';
-    case 'shopping': return '🛍️';
-    case 'hotel': return '🏨';
-    default: return '📍';
-  }
+
+const createPlacePin = (type, isHighlighted = false) => {
+  const color = getPlaceColor(type);
+  const size = isHighlighted ? 34 : 26;
+  const stroke = isHighlighted ? '#FFD700' : 'white';
+  const sw = isHighlighted ? '2.5' : '2';
+  // Use a small letter/shape inside based on type
+  const innerShape = {
+    restaurant: `<rect x="9" y="8" width="10" height="9" rx="1.5" fill="white" opacity="0.85"/>
+                 <line x1="14" y1="7" x2="14" y2="17" stroke="${color}" stroke-width="1.2"/>
+                 <line x1="10" y1="11" x2="18" y2="11" stroke="${color}" stroke-width="1.2"/>`,
+    parking:    `<text font-size="9" font-weight="700" font-family="sans-serif" fill="white" 
+                  text-anchor="middle" x="14" y="17" opacity="0.95">P</text>`,
+    attraction: `<polygon points="14,7 16,12 21,12 17,15 18.5,20 14,17 9.5,20 11,15 7,12 12,12" 
+                  fill="white" opacity="0.85"/>`,
+    park:       `<ellipse cx="14" cy="11" rx="5" ry="4" fill="white" opacity="0.85"/>
+                 <rect x="12.5" y="13" width="3" height="5" fill="white" opacity="0.85"/>`,
+    shopping:   `<rect x="9" y="10" width="10" height="8" rx="1" fill="none" stroke="white" stroke-width="1.3" opacity="0.9"/>
+                 <path d="M11 10 Q11 7 14 7 Q17 7 17 10" fill="none" stroke="white" stroke-width="1.3" opacity="0.9"/>`,
+    hotel:      `<text font-size="9" font-weight="700" font-family="sans-serif" fill="white" 
+                  text-anchor="middle" x="14" y="17" opacity="0.95">H</text>`,
+    other:      `<circle cx="14" cy="13" r="4" fill="white" opacity="0.8"/>`,
+  }[type] || `<circle cx="14" cy="13" r="4" fill="white" opacity="0.8"/>`;
+
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size * 1.3}" viewBox="0 0 28 36">
+      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z"
+        fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>
+      ${innerShape}
+    </svg>`,
+    iconSize: [size, size * 1.3],
+    iconAnchor: [size / 2, size * 1.3],
+    popupAnchor: [0, -(size * 1.3)],
+  });
+};
+
+const originIcon            = createPinIcon('#2C5282');
+const originIconHighlight   = createPinIconHighlighted('#2C5282');
+const destIcon              = createPinIcon('#E53E3E');
+const destIconHighlight     = createPinIconHighlighted('#E53E3E');
+const userLocationIcon      = createDotIcon('#2C5282');
+const userLocationIconHighlight = createDotIconHighlighted('#2C5282');
+const getPlaceIcon = (type, size = 14, color = 'currentColor') => {
+  const icons = {
+    restaurant: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2l0 7a4 4 0 0 0 8 0l0 -7"/><path d="M7 2l0 7"/><path d="M21 15a2 2 0 0 1 -2 2h-7l-5 3v-14h12a2 2 0 0 1 2 2z"/></svg>,
+    parking:    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 7h-3v10"/><path d="M13 13a3 3 0 0 0 0 -6h-3"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>,
+    attraction: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21l18 0"/><path d="M6 21v-14a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14"/><path d="M9 21v-6a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6"/></svg>,
+    park:       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l4 4l-2 0l0 3l3 0l0 -2l4 4l-4 4l0 -2l-3 0l0 3l2 0l-4 4l-4 -4l2 0l0 -3l-3 0l0 2l-4 -4l4 -4l0 2l3 0l0 -3l-2 0z"/></svg>,
+    shopping:   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2l1.5 3h9l1.5 -3"/><path d="M3 6h18l-2 13h-14z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>,
+    hotel:      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-10a4 4 0 0 1 -4 -4z"/><path d="M7 10a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M13 10h4v4h-4z"/></svg>,
+    other:      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/></svg>,
+  };
+  return icons[type] || icons.other;
 };
 
 const getPlaceColor = (type) => {
@@ -73,7 +135,7 @@ const getPlaceColor = (type) => {
 };
 
 const createPlaceIcon = (type, isHighlighted = false) => {
-  const emoji = getPlaceEmoji(type);
+  const emoji = getPlaceIcon(type);
   const size = isHighlighted ? 36 : 28;
   const fontSize = isHighlighted ? 18 : 14;
   const borderWidth = isHighlighted ? '3px' : '2px';
@@ -330,11 +392,15 @@ function SearchInput({ placeholder, value, onChange, onSelect, icon, isMobile })
             <div
               key={i}
               onClick={() => handleSelect(s)}
-              style={{ padding: isMobile ? '8px 12px' : '10px 14px', fontSize: isMobile ? '11px' : '12px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none', color: '#333' }}
+              style={{ padding: isMobile ? '8px 12px' : '10px 14px', fontSize: isMobile ? '11px' : '12px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none', color: '#333', display: 'flex', alignItems: 'center', gap: '8px' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#EBF4FF')}
               onMouseLeave={e => (e.currentTarget.style.background = 'white')}
             >
-              📍 {s.properties.formatted}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="red" stroke="#718096" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+                <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+              </svg>
+              {s.properties.formatted}
             </div>
           ))}
         </div>
@@ -738,30 +804,41 @@ const MapScreen = ({
   };
 
   const getUserLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          const { latitude: lat, longitude: lng } = position.coords;
-          if (pickMode) {
-            handlePickMapClick({ lat, lng });
-            return;
-          }
-          const userLoc = { lat, lng, label: 'Your Location' };
-          setUserLocation(userLoc);
-          setOrigin(userLoc);
-          setOriginText('Your Location');
-          setFlyTo([lat, lng]);
-          setWeatherLocation(userLoc);
-        },
-        error => {
-          console.error(error);
-          alert('Unable to get your location. Please enter it manually.');
-        }
-      );
-    } else {
-      alert('Geolocation is not supported by your browser.');
+  if (!('geolocation' in navigator)) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const { latitude: lat, longitude: lng } = position.coords;
+      if (pickMode) {
+        handlePickMapClick({ lat, lng });
+        return;
+      }
+      const userLoc = { lat, lng, label: 'Your Location' };
+      setUserLocation(userLoc);
+      setOrigin(userLoc);
+      setOriginText('Your Location');
+      setFlyTo([lat, lng]);
+      setWeatherLocation(userLoc);
+    },
+    error => {
+      console.error('Geolocation error:', error.code, error.message);
+      const messages = {
+        1: 'Location permission denied. Please allow location access in your browser settings.',
+        2: 'Your position could not be determined. Try again.',
+        3: 'Location request timed out. Please try again.',
+      };
+      alert(messages[error.code] || 'Unable to get your location. Please enter it manually.');
+    },
+    {
+      enableHighAccuracy: false,   // faster, less battery drain
+      timeout: 10000,              // 10s before error callback
+      maximumAge: 60000,           // accept a cached position up to 1 min old
     }
-  };
+  );
+};
 
   const handleMapSetOrigin = async latlng => {
     if (pickMode) return;
@@ -985,15 +1062,22 @@ const MapScreen = ({
     { key: 'transit', icon: '🚌', label: 'Transit' },
   ];
 
-  const placeFilterOptions = [
-    { key: 'all', label: 'All', icon: '📍' },
-    { key: 'restaurant', label: 'Restaurants', icon: '🍽️' },
-    { key: 'parking', label: 'Parking', icon: '🅿️' },
-    { key: 'attraction', label: 'Attractions', icon: '🏛️' },
-    { key: 'park', label: 'Parks', icon: '🌳' },
-    { key: 'shopping', label: 'Shopping', icon: '🛍️' },
-    { key: 'hotel', label: 'Hotels', icon: '🏨' },
-  ];
+  const pinSvg = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+    <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+  </svg>
+);
+
+const placeFilterOptions = [
+  { key: 'all',        label: 'All',         icon: pinSvg },
+  { key: 'restaurant', label: 'Restaurants', icon: getPlaceIcon('restaurant', 13) },
+  { key: 'parking',    label: 'Parking',     icon: getPlaceIcon('parking',    13) },
+  { key: 'attraction', label: 'Attractions', icon: getPlaceIcon('attraction', 13) },
+  { key: 'park',       label: 'Parks',       icon: getPlaceIcon('park',       13) },
+  { key: 'shopping',   label: 'Shopping',    icon: getPlaceIcon('shopping',   13) },
+  { key: 'hotel',      label: 'Hotels',      icon: getPlaceIcon('hotel',      13) },
+];
 
   const mapContent = (
     <>
@@ -1025,7 +1109,7 @@ const MapScreen = ({
         />
       ))}
       {!pickMode && getFilteredPlaces().map((place, idx) => (
-        <Marker key={idx} position={[place.lat, place.lng]} icon={createPlaceIcon(place.type, false)}>
+        <Marker key={idx} position={[place.lat, place.lng]} icon={createPlacePin(place.type, false)}>
           <Popup>
             <strong>{place.name}</strong><br />
             {place.rating && <span>⭐ Rating: {place.rating}/5<br /></span>}
@@ -1124,7 +1208,10 @@ const renderPlacesBottomSheet = () => (
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px' }}>📍</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+                <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+              </svg>
               <div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: 'white', letterSpacing: '-0.3px' }}>
                   Suggested Places
@@ -1247,7 +1334,7 @@ const renderPlacesBottomSheet = () => (
                         marginRight: '14px',
                       }}
                     >
-                      {getPlaceIconForCard(place.type)}
+                      {getPlaceIcon(place.type, 24, getPlaceColor(place.type))}
                     </div>
 
                     {/* Content */}
@@ -1298,7 +1385,11 @@ const renderPlacesBottomSheet = () => (
                           {place.type}
                         </span>
                         <span style={{ fontSize: '10px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          📍 {place.distance}m away
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="red" stroke="#4a5568" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+                            <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+                          </svg>
+                          {place.distance}m away
                         </span>
                       </div>
                     </div>
@@ -1415,7 +1506,13 @@ const renderPlacesBottomSheet = () => (
 
       {pickMode ? (
         <div style={{ position: 'absolute', top: '20px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', background: 'rgba(255,255,255,0.97)', borderRadius: '18px', padding: '14px 16px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', marginBottom: '8px' }}>📍 Pin your {isActivityPickContext(pickContext) ? 'activity' : 'event'} location</div>
+          <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A365D', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A365D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+              <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+            </svg>
+            Pin your {isActivityPickContext(pickContext) ? 'activity' : 'event'} location
+          </div>
           <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px', lineHeight: 1.45 }}>Tap anywhere on the map to place or move the pin.{pickHintLabel ? <span style={{ display: 'block', marginTop: '6px', fontSize: '11px', opacity: 0.85 }}>Hint: {pickHintLabel}</span> : null}</p>
           {pickLoading && <div style={{ fontSize: '11px', color: '#718096', marginBottom: '8px' }}>Resolving address…</div>}
           {pickedLabel && <div style={{ fontSize: '11px', color: '#2C5282', marginBottom: '10px', padding: '8px 10px', background: '#EBF8FF', borderRadius: '10px', maxHeight: '72px', overflowY: 'auto' }}>{pickedLabel}</div>}
@@ -1441,16 +1538,31 @@ const renderPlacesBottomSheet = () => (
           </div>
 
           {!pickMode && (
-            <div style={{ position: 'absolute', top: '80px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'absolute', top: '50px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => setShowSearchPanel(!showSearchPanel)} style={{ backgroundColor: showSearchPanel ? '#2C5282' : '#ffffff', color: showSearchPanel ? 'white' : '#2C5282', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
-                🗺️ {showSearchPanel ? 'Hide Route' : 'Show Route'}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <path d="M8 7v13M16 7v13M3 11h18M3 15h5M16 15h5"/>
+                </svg>
+                {showSearchPanel ? 'Hide Route' : 'Show Route'}
               </button>
+
               <button onClick={() => setShowPlacesPanel(!showPlacesPanel)} style={{ backgroundColor: showPlacesPanel ? '#FF9800' : '#ffffff', color: showPlacesPanel ? 'white' : '#FF9800', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
-                📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 11m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+                  <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>
+                </svg>
+                {showPlacesPanel ? 'Hide Places' : 'Show Places'}
               </button>
+
               {waypointsList.length > 0 && (
                 <button onClick={() => setShowItineraryPanel(!showItineraryPanel)} style={{ backgroundColor: showItineraryPanel ? '#7B1FA2' : '#ffffff', color: showItineraryPanel ? 'white' : '#7B1FA2', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
-                  📋 {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 5h-2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-12a2 2 0 0 0-2-2h-2"/>
+                    <path d="M9 3m0 2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>
+                    <path d="M9 12h6M9 16h6"/>
+                  </svg>
+                  {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}
                 </button>
               )}
             </div>
@@ -1467,7 +1579,7 @@ const renderPlacesBottomSheet = () => (
       transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
       style={{
         position: 'absolute',
-        top: '130px',
+        top: '100px',
         left: '10px',
         right: '10px',
         zIndex: 1002,
@@ -1491,7 +1603,10 @@ const renderPlacesBottomSheet = () => (
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '22px' }}>🗺️</span>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7l6-3l6 3l6-3v13l-6 3l-6-3l-6 3z"/>
+            <path d="M9 4v13M15 7v13"/>
+          </svg>
           <div>
             <div style={{ fontSize: '16px', fontWeight: '800', color: 'white', letterSpacing: '-0.3px' }}>
               Route Planner
@@ -1544,23 +1659,13 @@ const renderPlacesBottomSheet = () => (
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={getUserLocation}
-              style={{
-                padding: '10px 14px',
-                borderRadius: '16px',
-                border: 'none',
-                background: '#edf2f7',
-                color: '#2c5282',
-                cursor: 'pointer',
-                fontSize: '18px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
-              }}
+              style={{ padding: '10px 12px', borderRadius: '16px', border: 'none', background: '#edf2f7', color: '#2c5282', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="Use my current location"
             >
-              📍
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2c5282" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/>
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              </svg>
             </motion.button>
           </div>
 

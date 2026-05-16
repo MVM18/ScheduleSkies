@@ -1,11 +1,13 @@
 /* The container to center the spinner */
 .spinner-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 20px;
   height: 100%;
   width: 100%;
+  gap: 12px;
 }
 
 /* The actual spinner */
@@ -18,6 +20,11 @@
   animation: spin 1s linear infinite;
 }
 
+.spinner-container p {
+  margin: 0; /* Clears default paragraph margins for precise spacing */
+  font-weight: 700;
+  color: #333;
+}
 /* The animation logic */
 @keyframes spin {
   to {

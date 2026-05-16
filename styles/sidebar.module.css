@@ -39,23 +39,6 @@
   color: #3498db;
 }
 
-.icon {
-  width: 30px;
-  height: 30px;
-}
-
-.icon path {
-  fill: #000;
-}
-
-.active {
-  background-color: #FFF4D840;
-}
-
-.active .icon path {
-  fill: #fff;
-}
-
 .quickMenuContainer {
   margin-top: auto;
   position: relative;
@@ -169,12 +152,4 @@
 
 [data-theme='dark'] .sidebar {
   background-color: #1e293b;
-}
-
-[data-theme='dark'] .icon path {
-  fill: #94a3b8;
-}
-
-[data-theme='dark'] .active .icon path {
-  fill: #ffffff;
 }

@@ -53,10 +53,40 @@
   display: flex;
   width: 50px;
   height: 50px;
-  background-color: #FFF4D8;
+  background-color: rgb(46, 80, 133);
   justify-content: center;
   align-items: center;
   border-radius: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.btn:hover, .btn:hover .icon path {
+  background-color: #FFF4D8;
+}
+
+.btn:hover .icon path {
+  fill: #000000;
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+}
+
+.icon path {
+  fill: #fff;
+}
+
+.icon:hover path {
+  fill: #000;
+}
+
+.active {
+  background-color: #FFF4D8;
+}
+
+.active .icon path {
+  fill: #000;
 }
 
 /* --- Background Decor --- */
@@ -121,4 +151,24 @@
 
 [data-theme='dark'] .dashboard {
   background: #111827;
+}
+
+[data-theme='dark'] .btn {
+  background-color: #1e293b;
+}
+
+[data-theme='dark'] .btn:hover {
+  background-color: #4f46e5;
+}
+
+[data-theme='dark'] .active {
+  background-color: #4f46e5;
+}
+
+[data-theme='dark'] .icon path {
+  fill: #94a3b8;
+}
+
+[data-theme='dark'] .active .icon path,[data-theme='dark'] .btn:hover .icon path {
+  fill: #ffffff;
 }

@@ -75,6 +75,8 @@
   gap: 0.7rem;
   margin-top: 0.85rem;
   flex-wrap: wrap;
+  align-items: center;
+  justify-items: center;
 }
 
 .quickStats span {
