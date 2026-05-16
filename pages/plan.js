@@ -10,9 +10,9 @@ import BudgetModal from '@/components/BudgetModal';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TimeKeeper from 'react-timekeeper';
-import { 
-  addMonths, subMonths, format, startOfMonth, endOfMonth, 
-  startOfWeek, endOfWeek, isSameMonth, addDays, isToday 
+import {
+  addMonths, subMonths, format, startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek, isSameMonth, addDays, isToday
 } from 'date-fns';
 import {
   readPendingItinerary,
@@ -21,6 +21,7 @@ import {
   buildActivityDraftsFromStructured,
 } from '@/lib/itineraryImportShared';
 import EventGalleryHeader from '@/components/EventGalleryHeader'
+import { buildItineraryWaypoints } from '@/lib/buildItineraryWaypoints';
 
 const MAP_PICK_KEY_EVENT = 'scheduleSkies_mapPick_event';
 const MAP_PICK_KEY_ACTIVITY = 'scheduleSkies_mapPick_activity';
@@ -122,7 +123,9 @@ const MyEvents = () => {
   // Modal & Form States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [calendarDirection, setCalendarDirection] = useState(0); 
+  const [calendarDirection, setCalendarDirection] = useState(0);
+  const [selectedCalDate, setSelectedCalDate] = useState(null); // 'yyyy-MM-dd' or null
+  const [calViewMode, setCalViewMode] = useState('events'); // 'events' | 'activities'
   const [isEditListMode, setIsEditListMode] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -691,6 +694,44 @@ const MyEvents = () => {
     }
   };
 
+  // Real-time sync when itinerary modal is open (owner + collaborators)
+  useEffect(() => {
+    if (!isItineraryOpen || !selectedEventForItinerary?.id) return;
+    const eventId = selectedEventForItinerary.id;
+    const channel = supabase
+      .channel(`plan-itinerary-${eventId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'itinerary_activities',
+        filter: `event_id=eq.${eventId}`,
+      }, (payload) => {
+        setActivities(prev => {
+          if (prev.find(a => a.id === payload.new.id)) return prev;
+          return [...prev, payload.new].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        });
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'itinerary_activities',
+        filter: `event_id=eq.${eventId}`,
+      }, (payload) => {
+        setActivities(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'itinerary_activities',
+        filter: `event_id=eq.${eventId}`,
+      }, (payload) => {
+        setActivities(prev => prev.filter(a => a.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [isItineraryOpen, selectedEventForItinerary?.id]);
+
   const openMapPickerForEvent = () => {
     try {
       sessionStorage.setItem(PLAN_RESTORE_STORAGE_KEY, JSON.stringify({
@@ -734,7 +775,9 @@ const MyEvents = () => {
   useEffect(() => {
     if (typeof window === 'undefined' || !userId) return;
 
-    const consumeTimedMapPick = (storageKey) => {
+    // Peek at a map pick key WITHOUT removing it from sessionStorage.
+    // Returns the parsed object or null. Does NOT consume the entry.
+    const peekTimedMapPick = (storageKey) => {
       const raw = sessionStorage.getItem(storageKey);
       if (!raw) return null;
       try {
@@ -743,7 +786,6 @@ const MyEvents = () => {
           sessionStorage.removeItem(storageKey);
           return null;
         }
-        sessionStorage.removeItem(storageKey);
         return mapPick;
       } catch {
         sessionStorage.removeItem(storageKey);
@@ -751,7 +793,19 @@ const MyEvents = () => {
       }
     };
 
+    // Consume (read + remove) a map pick key from sessionStorage.
+    const consumeTimedMapPick = (storageKey) => {
+      const mapPick = peekTimedMapPick(storageKey);
+      if (mapPick) sessionStorage.removeItem(storageKey);
+      return mapPick;
+    };
+
+    // --- Peek at the restore key to decide whether we should defer ---
+    // If we have a pending activity restore but eventData hasn't loaded yet,
+    // we must NOT consume map pick keys — they'd be lost before the form opens.
     const restoreRaw = sessionStorage.getItem(PLAN_RESTORE_STORAGE_KEY);
+    let pendingActivityRestore = false;
+
     if (restoreRaw) {
       try {
         const restore = JSON.parse(restoreRaw);
@@ -760,22 +814,32 @@ const MyEvents = () => {
           setFormData(restore.formDataSnapshot);
           setEditingId(restore.editingId ?? null);
           setIsFormOpen(true);
-        } else if (restore.type === 'activity' && restore.itineraryEventId && eventData.length > 0) {
-          const ev = eventData.find(e => e.id === restore.itineraryEventId);
-          if (ev) {
-            sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
-            setSelectedEventForItinerary(ev);
-            setIsItineraryOpen(true);
-            setActivityForm(restore.activityFormSnapshot || initialActivityForm);
-            setIsActivityFormOpen(true);
-            setEditingActivityId(restore.editingActivityId ?? null);
-            fetchActivities(restore.itineraryEventId);
+        } else if (restore.type === 'activity' && restore.itineraryEventId) {
+          if (eventData.length > 0) {
+            const ev = eventData.find(e => e.id === restore.itineraryEventId);
+            if (ev) {
+              sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
+              setSelectedEventForItinerary(ev);
+              setIsItineraryOpen(true);
+              setActivityForm(restore.activityFormSnapshot || initialActivityForm);
+              setIsActivityFormOpen(true);
+              setEditingActivityId(restore.editingActivityId ?? null);
+              fetchActivities(restore.itineraryEventId);
+              // Activity restore succeeded — safe to consume picks below
+            }
+          } else {
+            // eventData not loaded yet — defer everything to next run
+            pendingActivityRestore = true;
           }
         }
       } catch {
         sessionStorage.removeItem(PLAN_RESTORE_STORAGE_KEY);
       }
     }
+
+    // If an activity restore is still waiting for eventData, don't consume
+    // the map pick keys yet — they'll be needed on the next effect run.
+    if (pendingActivityRestore) return;
 
     const actPick = consumeTimedMapPick(MAP_PICK_KEY_ACTIVITY);
     if (actPick?.context === 'activity') {
@@ -856,9 +920,11 @@ const MyEvents = () => {
       return;
     }
 
-    const activityData = {
-      event_id: selectedEventForItinerary.id,
-      user_id: userId,
+    const activityOwnerId = selectedEventForItinerary.isShared
+      ? selectedEventForItinerary.user_id
+      : userId;
+
+    const activityFields = {
       activity_name: activityForm.activity_name,
       description: activityForm.description || null,
       start_time: activityForm.start_time ? new Date(activityForm.start_time).toISOString() : null,
@@ -870,9 +936,12 @@ const MyEvents = () => {
     };
 
     if (editingActivityId) {
+      const updatePayload = selectedEventForItinerary.isShared
+        ? activityFields
+        : { ...activityFields, user_id: activityOwnerId };
       const { data, error } = await supabase
         .from('itinerary_activities')
-        .update(activityData)
+        .update(updatePayload)
         .eq('id', editingActivityId)
         .select();
       if (data && !error) {
@@ -881,7 +950,11 @@ const MyEvents = () => {
     } else {
       const { data, error } = await supabase
         .from('itinerary_activities')
-        .insert([activityData])
+        .insert([{
+          event_id: selectedEventForItinerary.id,
+          user_id: activityOwnerId,
+          ...activityFields,
+        }])
         .select();
       if (data && !error) {
         setActivities(prev => [...prev, data[0]]);
@@ -933,31 +1006,7 @@ const MyEvents = () => {
   };
 
   const handleNavigateItinerary = (event, activitiesList) => {
-    const waypoints = [];
-
-    if (event.latitude && event.longitude) {
-      waypoints.push({
-        lat: parseFloat(event.latitude),
-        lng: parseFloat(event.longitude),
-        label: event.venue || event.location || 'Event Venue'
-      });
-    }
-
-    activitiesList.forEach(a => {
-      if (a.location && a.location.trim()) {
-        if (a.latitude && a.longitude) {
-          waypoints.push({
-            lat: parseFloat(a.latitude),
-            lng: parseFloat(a.longitude),
-            label: a.location,
-            activityName: a.activity_name
-          });
-        } else {
-          waypoints.push({ label: a.location, activityName: a.activity_name });
-        }
-      }
-    });
-
+    const waypoints = buildItineraryWaypoints(event, activitiesList);
     if (waypoints.length > 0) {
       router.push(`/map?waypoints=${encodeURIComponent(JSON.stringify(waypoints))}`);
     } else {
@@ -1134,73 +1183,90 @@ const MyEvents = () => {
       const hasEvent = dayEvents.length > 0;
       const hasConflict = dayEvents.some(ev => calendarConflictEventIds.has(ev.id));
       const isCurrentMonth = isSameMonth(cloneDay, monthStart);
-      const isCurrentDay = isToday(cloneDay); 
+      const isCurrentDay = isToday(cloneDay);
+      const isSelected = selectedCalDate === dateStr;
 
       cellDays.push(
         <div
           key={cloneDay.toString()}
-          className={styles.calCell}
+          className={`${styles.calCell} ${isSelected ? styles.calCellSelected : ''}`}
+          onClick={() => setSelectedCalDate(prev => prev === dateStr ? null : dateStr)}
           onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnDate(dateStr); }}
           onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
           onDragLeave={() => setDragOverDate(null)}
           style={{
-            opacity: isCurrentMonth ? 1 : 0.4,
-            backgroundColor: dragOverDate === dateStr 
-              ? 'rgba(118, 181, 217, 0.2)' 
-              : hasConflict 
-                ? 'rgba(248, 113, 113, 0.12)' 
-                : hasEvent 
-                  ? 'rgba(94, 224, 147, 0.1)' 
-                  : '#1a1a1a',
-            border: dragOverDate === dateStr 
-              ? '2px dashed #76b5d9' 
-              : hasConflict 
-                ? '1px solid #EF4444' 
-                : hasEvent 
-                  ? '1px solid #5EE093' 
-                  : 'none'
+            opacity: isCurrentMonth ? 1 : 0.35,
+            backgroundColor: isSelected
+              ? 'rgba(118, 181, 217, 0.15)'
+              : dragOverDate === dateStr
+                ? 'rgba(118, 181, 217, 0.2)'
+                : hasConflict
+                  ? 'rgba(248, 113, 113, 0.12)'
+                  : hasEvent
+                    ? 'rgba(94, 224, 147, 0.08)'
+                    : '#1a1a1a',
+            border: isSelected
+              ? '2px solid #76b5d9'
+              : dragOverDate === dateStr
+                ? '2px dashed #76b5d9'
+                : hasConflict
+                  ? '1px solid #EF4444'
+                  : hasEvent
+                    ? '1px solid rgba(94, 224, 147, 0.3)'
+                    : '1px solid transparent',
+            cursor: 'pointer',
           }}
         >
-          <span 
-            className={styles.calDayNum} 
+          <span
+            className={styles.calDayNum}
             style={isCurrentDay ? {
-              backgroundColor: '#10B981', 
+              backgroundColor: '#10B981',
               color: 'white',
               borderRadius: '50%',
-              width: '24px',
-              height: '24px',
+              width: '26px',
+              height: '26px',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 'bold',
-              margin: '0 auto 6px auto'
+              margin: '0 auto 4px auto',
+              fontSize: '12px',
             } : hasEvent ? { fontWeight: 'bold', color: '#76b5d9' } : {}}
           >
             {format(cloneDay, 'd')}
           </span>
           <div className={styles.calEventsContainer}>
-            {dayEvents.map(ev => {
-              const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : 'All Day';
+            {dayEvents.slice(0, 3).map(ev => {
+              const eventTime = ev.start_datetime ? formatTime(ev.start_datetime) : '';
               const isConflict = calendarConflictEventIds.has(ev.id);
               return (
                 <div
                   key={ev.id}
                   className={styles.calEventPill}
                   draggable
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCalendarOpen(false);
+                    handleOpenItinerary(ev);
+                  }}
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', ev.id); handleDragStart(ev.id); }}
                   onDragEnd={handleDragEnd}
                   style={{
-                    backgroundColor: isConflict ? '#EF4444' : ev.typeColor,
+                    backgroundColor: isConflict ? '#EF4444' : (ev.typeColor || '#76b5d9'),
                     color: isConflict ? '#fff' : '#111',
                     border: isConflict ? '1px solid #DC2626' : undefined,
-                    cursor: 'grab'
+                    cursor: 'pointer',
                   }}
-                  title={`Drag to move event to another day`}
+                  title={`${ev.title}${eventTime ? ` · ${eventTime}` : ''} — Click to open`}
                 >
-                  {eventTime} · {ev.title}
+                  <span className={styles.calPillDot} style={{ backgroundColor: isConflict ? '#fff' : '#111' }}></span>
+                  {ev.title}
                 </div>
               );
             })}
+            {dayEvents.length > 3 && (
+              <div className={styles.calMoreLabel}>+{dayEvents.length - 3} more</div>
+            )}
           </div>
         </div>
       );
@@ -1429,7 +1495,7 @@ const MyEvents = () => {
               >
                 <span style={{ fontSize: '14px' }}>{isAiLoading ? '⏳' : '✨'}</span> {isAiLoading ? 'Analyzing...' : 'AI Suggest'}
               </button>
-              
+
             </div>
 
             {/* View toggle */}
@@ -1440,8 +1506,8 @@ const MyEvents = () => {
                 title="Grid view"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-                  <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                  <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
                 </svg>
               </button>
               <button
@@ -1450,8 +1516,8 @@ const MyEvents = () => {
                 title="List view"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10.5" width="18" height="3" rx="1"/>
-                  <rect x="3" y="17" width="18" height="3" rx="1"/>
+                  <rect x="3" y="4" width="18" height="3" rx="1" /><rect x="3" y="10.5" width="18" height="3" rx="1" />
+                  <rect x="3" y="17" width="18" height="3" rx="1" />
                 </svg>
               </button>
             </div>
@@ -1502,54 +1568,121 @@ const MyEvents = () => {
 
         {/* Event List */}
         {loading ? (
-            <div className="spinner-container">
-              <div className="loading-spinner"></div>
-            </div>
-          ) : (
-            <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
-              {filteredEvents.length === 0 ? (
-                <div className={styles.emptyState}>
-                  {ownershipFilter === 'shared' && sharedWithMeCount === 0
-                    ? 'Nothing has been shared with you yet. When someone adds you as a collaborator, their event will appear here.'
-                    : ownershipFilter === 'mine' && myEventsCount === 0
-                      ? 'You have no events you own yet. Click "Add" to create one.'
-                      : statusFilter === 'Done'
-                        ? 'No completed events yet.'
-                        : statusFilter === 'Upcoming'
-                          ? 'No upcoming events. Click "Add" to create one!'
-                          : 'No events match these filters.'}
-                </div>
-              ) : viewMode === 'grid' ? (
-                // ── GRID VIEW (existing) ──────────────────────────────────────────────
-                filteredEvents.map(event => {
-                  const status = getEventStatus(event)
-                  return (
-                    <div key={event.id} className={styles.eventCard} style={{
-                      position: 'relative',
-                      backgroundImage: `url(${event.image_link})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                    }}
+          <div className="spinner-container">
+            <div className="loading-spinner"></div>
+          </div>
+        ) : (
+          <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
+            {filteredEvents.length === 0 ? (
+              <div className={styles.emptyState}>
+                {ownershipFilter === 'shared' && sharedWithMeCount === 0
+                  ? 'Nothing has been shared with you yet. When someone adds you as a collaborator, their event will appear here.'
+                  : ownershipFilter === 'mine' && myEventsCount === 0
+                    ? 'You have no events you own yet. Click "Add" to create one.'
+                    : statusFilter === 'Done'
+                      ? 'No completed events yet.'
+                      : statusFilter === 'Upcoming'
+                        ? 'No upcoming events. Click "Add" to create one!'
+                        : 'No events match these filters.'}
+              </div>
+            ) : viewMode === 'grid' ? (
+              // ── GRID VIEW (existing) ──────────────────────────────────────────────
+              filteredEvents.map(event => {
+                const status = getEventStatus(event)
+                return (
+                  <div key={event.id} className={styles.eventCard} style={{
+                    position: 'relative',
+                    backgroundImage: `url(${event.image_link})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                  }}
                     onClick={() => handleOpenItinerary(event)}>
-                      <span>
-                        <div className={styles.titleContainer}>
-                          <p>{event.title}</p>
-                        </div>
-                      </span>
-                      
-                      <span
-                        className={styles.cardStatusBadge}
-                        style={{
-                          background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                          color: status === 'done' ? '#15A862' : '#4396D1',
-                          border: '0.5px solid black'
-                        }}
-                      >
-                        {status === 'done' ? 'Done' : 'Upcoming'}
-                      </span>
+                    <span>
+                      <div className={styles.titleContainer}>
+                        <p>{event.title}</p>
+                      </div>
+                    </span>
 
-                      <div style={{ display: 'flex', gap: '6px', position: 'absolute', bottom: '12px', left: '12px', right: '12px', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                    <span
+                      className={styles.cardStatusBadge}
+                      style={{
+                        background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                        color: status === 'done' ? '#15A862' : '#4396D1',
+                        border: '0.5px solid black'
+                      }}
+                    >
+                      {status === 'done' ? 'Done' : 'Upcoming'}
+                    </span>
+
+                    <div style={{ display: 'flex', gap: '6px', position: 'absolute', bottom: '12px', left: '12px', right: '12px', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                      {event.isShared && (
+                        <span style={{
+                          background: 'rgba(100, 116, 139, 0.95)',
+                          color: '#fff',
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                          backdropFilter: 'blur(8px)',
+                        }}>
+                          Shared with me
+                        </span>
+                      )}
+                    </div>
+                    {isEditListMode && (
+                      <div className={styles.cardActions}>
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            ) : (
+              // ── LIST VIEW ─────────────────────────────────────────────────────────
+              filteredEvents.map(event => {
+                const status = getEventStatus(event)
+                const range = event.start_datetime ? formatDateRange(event.start_datetime, event.end_datetime) : null
+                return (
+                  <div
+                    key={event.id}
+                    className={styles.eventListItem}
+                    onClick={() => handleOpenItinerary(event)}
+                  >
+                    {/* Thumbnail */}
+                    <div className={styles.listThumb}>
+                      {event.image_link
+                        ? <img src={event.image_link} alt={event.title} />
+                        : <div className={styles.listThumbPlaceholder}>{event.category[0]}</div>
+                      }
+                    </div>
+
+                    {/* Main info */}
+                    <div className={styles.listInfo}>
+                      <div className={styles.listTitle}>{event.title}</div>
+                      <div className={styles.listMeta}>
+                        {event.venue && <span>🏛️ {event.venue}</span>}
+                        <span>📍 {event.location}</span>
+                        {range && (
+                          <span>📅 {range.dateStr} · {range.startTime}{range.endTime ? ` – ${range.endTime}` : ''}</span>
+                        )}
+                      </div>
+                      <div className={styles.listTags}>
+                        <span
+                          className={styles.listCategoryTag}
+                          style={{ background: event.typeColor + '22', color: event.typeColor, border: `1px solid ${event.typeColor}44` }}
+                        >
+                          {event.category}
+                        </span>
+                        {event.price && <span className={styles.listPriceTag}>💰 {event.price}</span>}
+                      </div>
+                    </div>
+
+                    {/* Status + actions */}
+                    <div className={styles.listRight}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: isEditListMode ? '8px' : '0' }}>
                         {event.isShared && (
                           <span style={{
                             background: 'rgba(100, 116, 139, 0.95)',
@@ -1559,103 +1692,36 @@ const MyEvents = () => {
                             fontSize: '11px',
                             fontWeight: 700,
                             border: '0.5px solid rgba(255, 255, 255, 0.3)',
-                            backdropFilter: 'blur(8px)',
+                            whiteSpace: 'nowrap',
                           }}>
                             Shared with me
                           </span>
                         )}
+                        <span
+                          className={styles.cardStatusBadge}
+                          style={{
+                            background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
+                            color: status === 'done' ? '#15A862' : '#4396D1',
+                            border: '0.5px solid black',
+                            position: 'static',
+                          }}
+                        >
+                          {status === 'done' ? 'Done' : 'Upcoming'}
+                        </span>
                       </div>
                       {isEditListMode && (
-                        <div className={styles.cardActions}>
+                        <div className={styles.listActions}>
                           <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
                           <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
                         </div>
                       )}
                     </div>
-                  )
-                })
-              ) : (
-                // ── LIST VIEW ─────────────────────────────────────────────────────────
-                filteredEvents.map(event => {
-                  const status = getEventStatus(event)
-                  const range = event.start_datetime ? formatDateRange(event.start_datetime, event.end_datetime) : null
-                  return (
-                    <div
-                      key={event.id}
-                      className={styles.eventListItem}
-                      onClick={() => handleOpenItinerary(event)}
-                    >
-                      {/* Thumbnail */}
-                      <div className={styles.listThumb}>
-                        {event.image_link
-                          ? <img src={event.image_link} alt={event.title} />
-                          : <div className={styles.listThumbPlaceholder}>{event.category[0]}</div>
-                        }
-                      </div>
-
-                      {/* Main info */}
-                      <div className={styles.listInfo}>
-                        <div className={styles.listTitle}>{event.title}</div>
-                        <div className={styles.listMeta}>
-                          {event.venue && <span>🏛️ {event.venue}</span>}
-                          <span>📍 {event.location}</span>
-                          {range && (
-                            <span>📅 {range.dateStr} · {range.startTime}{range.endTime ? ` – ${range.endTime}` : ''}</span>
-                          )}
-                        </div>
-                        <div className={styles.listTags}>
-                          <span
-                            className={styles.listCategoryTag}
-                            style={{ background: event.typeColor + '22', color: event.typeColor, border: `1px solid ${event.typeColor}44` }}
-                          >
-                            {event.category}
-                          </span>
-                          {event.price && <span className={styles.listPriceTag}>💰 {event.price}</span>}
-                        </div>
-                      </div>
-
-                      {/* Status + actions */}
-                      <div className={styles.listRight}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: isEditListMode ? '8px' : '0' }}>
-                          {event.isShared && (
-                            <span style={{
-                              background: 'rgba(100, 116, 139, 0.95)',
-                              color: '#fff',
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              border: '0.5px solid rgba(255, 255, 255, 0.3)',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              Shared with me
-                            </span>
-                          )}
-                          <span
-                            className={styles.cardStatusBadge}
-                            style={{
-                              background: status === 'done' ? '#D1F2E0' : '#D5EAF9',
-                              color: status === 'done' ? '#15A862' : '#4396D1',
-                              border: '0.5px solid black',
-                              position: 'static',
-                            }}
-                          >
-                            {status === 'done' ? 'Done' : 'Upcoming'}
-                          </span>
-                        </div>
-                        {isEditListMode && (
-                          <div className={styles.listActions}>
-                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditForm(event) }} className={styles.iconBtnEdit}>✎</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id) }} className={styles.iconBtnDelete}>🗑</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </section>
-          )
+                  </div>
+                )
+              })
+            )}
+          </section>
+        )
         }
       </main>
 
@@ -1723,72 +1789,72 @@ const MyEvents = () => {
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>Price / Cost</label>
-                  <input required type="text" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder="e.g. ₱350/Person" />
+                  <label>Budget</label>
+                  <input required type="text" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder="e.g. ₱1000.00" />
                 </div>
               </div>
 
               {formData.image_link && (
+                <div style={{
+                  marginTop: '8px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  height: '120px',
+                  width: '100%',
+                  position: 'relative',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <img
+                    src={formData.image_link}
+                    alt="Location preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                   <div style={{
-                    marginTop: '8px',
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                    height: '120px',
-                    width: '100%',
-                    position: 'relative',
-                    border: '1px solid #e2e8f0'
+                    position: 'absolute',
+                    bottom: 0, left: 0, right: 0,
+                    padding: '6px 10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    fontSize: '10px',
+                    color: '#fff',
+                    fontWeight: 500
                   }}>
-                    <img
-                      src={formData.image_link}
-                      alt="Location preview"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 0, left: 0, right: 0,
-                      padding: '6px 10px',
-                      background: 'rgba(0,0,0,0.5)',
-                      fontSize: '10px',
-                      color: '#fff',
-                      fontWeight: 500
-                    }}>
-                      {formData.image_link.includes('unsplash') ? '🖼️ Placeholder image' : '📍 Location photo from Google'}
-                    </div>
+                    {formData.image_link.includes('unsplash') ? '🖼️ Placeholder image' : '📍 Location photo from Google'}
                   </div>
-                )}
+                </div>
+              )}
 
               {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI */}
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>Start Date & Time</label>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       style={{ flex: 1.5 }}
-                      value={getDatePart(formData.start_datetime)} 
+                      value={getDatePart(formData.start_datetime)}
                       onChange={e => {
                         const timePart = getTimePart(formData.start_datetime);
                         const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
                         setFormData({ ...formData, start_datetime: newVal, date: e.target.value || formData.date });
-                      }} 
+                      }}
                     />
                     <div style={{ position: 'relative', flex: 1 }}>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         readOnly
                         style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
-                        value={formatDisplayTime(getTimePart(formData.start_datetime))} 
+                        value={formatDisplayTime(getTimePart(formData.start_datetime))}
                         onClick={() => setShowEventStartClock(true)}
                         placeholder="Time"
                       />
                       <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                      
+
                       {/* React Timekeeper Popup */}
                       {showEventStartClock && (
                         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventStartClock(false)} />
                           <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
-                            <TimeKeeper 
+                            <TimeKeeper
                               time={getTimePart(formData.start_datetime)}
                               onChange={(data) => {
                                 const datePart = getDatePart(formData.start_datetime);
@@ -1806,38 +1872,38 @@ const MyEvents = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>End Date & Time</label>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       style={{ flex: 1.5 }}
-                      value={getDatePart(formData.end_datetime)} 
+                      value={getDatePart(formData.end_datetime)}
                       onChange={e => {
                         const timePart = getTimePart(formData.end_datetime);
                         const newVal = e.target.value ? `${e.target.value}T${timePart}` : '';
                         setFormData({ ...formData, end_datetime: newVal });
-                      }} 
+                      }}
                     />
                     <div style={{ position: 'relative', flex: 1 }}>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         readOnly
                         style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
-                        value={formatDisplayTime(getTimePart(formData.end_datetime))} 
+                        value={formatDisplayTime(getTimePart(formData.end_datetime))}
                         onClick={() => setShowEventEndClock(true)}
                         placeholder="Time"
                       />
                       <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                      
+
                       {/* React Timekeeper Popup */}
                       {showEventEndClock && (
                         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowEventEndClock(false)} />
                           <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
-                            <TimeKeeper 
+                            <TimeKeeper
                               time={getTimePart(formData.end_datetime)}
                               onChange={(data) => {
                                 const datePart = getDatePart(formData.end_datetime) || getDatePart(formData.start_datetime);
@@ -1903,7 +1969,7 @@ const MyEvents = () => {
       {isItineraryOpen && selectedEventForItinerary && (
         <div className={styles.modalOverlay} onClick={() => setIsItineraryOpen(false)}>
           <div className={styles.itineraryModal} onClick={(e) => e.stopPropagation()}>
-            
+
             {/* Gallery Header */}
             <EventGalleryHeader
               event={selectedEventForItinerary}
@@ -2062,41 +2128,41 @@ const MyEvents = () => {
                         <label>Activity Name *</label>
                         <input required type="text" value={activityForm.activity_name} onChange={e => setActivityForm({ ...activityForm, activity_name: e.target.value })} placeholder="e.g. Opening Speech" />
                       </div>
-                      
+
                       {/* SPLIT DATE AND TIME FOR REACT-TIMEKEEPER CLOCK UI ON ACTIVITIES */}
                       <div>
                         <label>Start *</label>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <input 
-                            required 
-                            type="date" 
+                          <input
+                            required
+                            type="date"
                             style={{ flex: 1.5 }}
-                            value={getDatePart(activityForm.start_time)} 
+                            value={getDatePart(activityForm.start_time)}
                             onChange={e => {
                               const timePart = getTimePart(activityForm.start_time);
                               setActivityForm({ ...activityForm, start_time: `${e.target.value}T${timePart}` });
-                            }} 
-                            min={selectedEventForItinerary?.start_datetime?.split('T')[0]} 
-                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                            }}
+                            min={selectedEventForItinerary?.start_datetime?.split('T')[0]}
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]}
                           />
                           <div style={{ position: 'relative', flex: 1 }}>
-                            <input 
-                              required 
-                              type="text" 
+                            <input
+                              required
+                              type="text"
                               readOnly
                               style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
-                              value={formatDisplayTime(getTimePart(activityForm.start_time))} 
+                              value={formatDisplayTime(getTimePart(activityForm.start_time))}
                               onClick={() => setShowActStartClock(true)}
                               placeholder="Time"
                             />
                             <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                            
+
                             {/* React Timekeeper Popup */}
                             {showActStartClock && (
                               <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActStartClock(false)} />
                                 <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
-                                  <TimeKeeper 
+                                  <TimeKeeper
                                     time={getTimePart(activityForm.start_time)}
                                     onChange={(data) => {
                                       const datePart = getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]);
@@ -2117,36 +2183,36 @@ const MyEvents = () => {
                       <div>
                         <label>End *</label>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <input 
-                            required 
-                            type="date" 
+                          <input
+                            required
+                            type="date"
                             style={{ flex: 1.5 }}
-                            value={getDatePart(activityForm.end_time)} 
+                            value={getDatePart(activityForm.end_time)}
                             onChange={e => {
                               const timePart = getTimePart(activityForm.end_time);
                               setActivityForm({ ...activityForm, end_time: `${e.target.value}T${timePart}` });
-                            }} 
-                            min={getDatePart(activityForm.start_time) || selectedEventForItinerary?.start_datetime?.split('T')[0]} 
-                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]} 
+                            }}
+                            min={getDatePart(activityForm.start_time) || selectedEventForItinerary?.start_datetime?.split('T')[0]}
+                            max={selectedEventForItinerary?.end_datetime?.split('T')[0]}
                           />
                           <div style={{ position: 'relative', flex: 1 }}>
-                            <input 
-                              required 
-                              type="text" 
+                            <input
+                              required
+                              type="text"
                               readOnly
                               style={{ width: '100%', paddingLeft: '32px', cursor: 'pointer' }}
-                              value={formatDisplayTime(getTimePart(activityForm.end_time))} 
+                              value={formatDisplayTime(getTimePart(activityForm.end_time))}
                               onClick={() => setShowActEndClock(true)}
                               placeholder="Time"
                             />
                             <Clock size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                            
+
                             {/* React Timekeeper Popup */}
                             {showActEndClock && (
                               <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowActEndClock(false)} />
                                 <div style={{ position: 'relative', zIndex: 100000, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '8px', background: 'white' }}>
-                                  <TimeKeeper 
+                                  <TimeKeeper
                                     time={getTimePart(activityForm.end_time)}
                                     onChange={(data) => {
                                       const datePart = getDatePart(activityForm.end_time) || (getDatePart(activityForm.start_time) || (selectedEventForItinerary?.start_datetime?.split('T')[0] || new Date().toISOString().split('T')[0]));
@@ -2258,30 +2324,42 @@ const MyEvents = () => {
       {isCalendarOpen && (
         <div className={styles.modalOverlay} onClick={() => setIsCalendarOpen(false)}>
           <div className={styles.calendarModal} onClick={(e) => e.stopPropagation()}>
-            
+
             {/* Header */}
             <div className={styles.calHeader}>
               <div className={styles.calHeaderLeft}>
                 <button className={styles.calTodayBtn} onClick={handleToday}>Today</button>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button 
-                    onClick={handlePrevMonth} 
+                <div className={styles.calNavBtns}>
+                  <button
+                    className={styles.calArrowBtn}
+                    onClick={handlePrevMonth}
                     onDragEnter={(e) => { e.preventDefault(); handlePrevMonth(); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
                   >
-                    <ChevronLeft size={16} /> Prev
+                    <ChevronLeft size={16} />
+                    <span className={styles.calArrowLabel}>Prev</span>
                   </button>
-                  <button 
-                    onClick={handleNextMonth} 
+                  <button
+                    className={styles.calArrowBtn}
+                    onClick={handleNextMonth}
                     onDragEnter={(e) => { e.preventDefault(); handleNextMonth(); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #444', background: '#2a2a2a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
                   >
-                    Next <ChevronRight size={16} />
+                    <span className={styles.calArrowLabel}>Next</span>
+                    <ChevronRight size={16} />
                   </button>
                 </div>
                 <h2>{format(calendarDate, "MMMM yyyy")}</h2>
               </div>
               <div className={styles.calHeaderRight}>
+                {/* View Mode Toggle */}
+                <div className={styles.calViewToggle}>
+                  <button
+                    className={`${styles.calViewBtn} ${calViewMode === 'events' ? styles.calViewBtnActive : ''}`}
+                    onClick={() => setCalViewMode('events')}
+                  >
+                    📅 Events
+                  </button>
+
+                </div>
                 <button className={styles.calCloseBtn} onClick={() => setIsCalendarOpen(false)}>✕</button>
               </div>
             </div>
@@ -2292,7 +2370,7 @@ const MyEvents = () => {
             </div>
 
             {/* Calendar Grid with Framer Motion Drag/Swipe */}
-            <div style={{ overflow: 'hidden', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ overflow: 'hidden', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <AnimatePresence initial={false} custom={calendarDirection} mode="popLayout">
                 <motion.div
                   key={calendarDate.toString()}
@@ -2304,7 +2382,7 @@ const MyEvents = () => {
                   transition={{ duration: 0.3, ease: "easeInOut" }}
                   drag="x"
                   dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={1} 
+                  dragElastic={1}
                   onDragEnd={handleMonthDragEnd}
                   className={styles.calGrid}
                   style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', touchAction: 'pan-y' }}
@@ -2313,6 +2391,85 @@ const MyEvents = () => {
                 </motion.div>
               </AnimatePresence>
             </div>
+
+            {/* Detail Panel — shows when a date is selected */}
+            {selectedCalDate && (() => {
+              const selectedEvents = eventData.filter(e => getEventCalendarDate(e) === selectedCalDate);
+              const formattedDate = new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+              return (
+                <div className={styles.calDetailPanel}>
+                  <div className={styles.calDetailHeader}>
+                    <div>
+                      <div className={styles.calDetailDate}>{formattedDate}</div>
+                      <div className={styles.calDetailCount}>
+                        {selectedEvents.length} event{selectedEvents.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                    <button
+                      className={styles.calDetailClose}
+                      onClick={() => setSelectedCalDate(null)}
+                    >✕</button>
+                  </div>
+
+                  {selectedEvents.length === 0 ? (
+                    <div className={styles.calDetailEmpty}>
+                      <span>📭</span> No events on this date
+                    </div>
+                  ) : (
+                    <div className={styles.calDetailList}>
+                      {selectedEvents.map(ev => {
+                        const evTime = ev.start_datetime ? formatTime(ev.start_datetime) : '';
+                        const evEndTime = ev.end_datetime ? formatTime(ev.end_datetime) : '';
+                        const isConflict = calendarConflictEventIds.has(ev.id);
+                        return (
+                          <div key={ev.id} className={`${styles.calDetailItem} ${isConflict ? styles.calDetailConflict : ''}`}>
+                            <div
+                              className={styles.calDetailColor}
+                              style={{ backgroundColor: isConflict ? '#EF4444' : (ev.typeColor || '#76b5d9') }}
+                            ></div>
+                            <div className={styles.calDetailInfo}>
+                              <div className={styles.calDetailTitle}>{ev.title}</div>
+                              <div className={styles.calDetailMeta}>
+                                {evTime && <span>🕐 {evTime}{evEndTime ? ` – ${evEndTime}` : ''}</span>}
+                                {ev.location && <span>📍 {ev.location.split(',')[0]}</span>}
+                                {ev.category && <span className={styles.calDetailCat} style={{ background: (ev.typeColor || '#76b5d9') + '22', color: ev.typeColor || '#76b5d9' }}>{ev.category}</span>}
+                                {isConflict && <span className={styles.calDetailConflictBadge}>⚠️ Conflict</span>}
+                              </div>
+                            </div>
+                            <div className={styles.calDetailActions}>
+                              <button
+                                className={styles.calDetailBtn}
+                                onClick={() => { setIsCalendarOpen(false); handleOpenItinerary(ev); }}
+                                title="Open Itinerary"
+                              >
+                                📋
+                              </button>
+                              {(ev.latitude && ev.longitude) && (
+                                <button
+                                  className={styles.calDetailBtn}
+                                  onClick={() => { setIsCalendarOpen(false); handleNavigateToVenue(ev); }}
+                                  title="Navigate"
+                                >
+                                  🧭
+                                </button>
+                              )}
+                              <button
+                                className={styles.calDetailBtn}
+                                onClick={() => { setIsCalendarOpen(false); setSelectedEventForBudget(ev); setIsBudgetOpen(true); }}
+                                title="Budget"
+                              >
+                                💰
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

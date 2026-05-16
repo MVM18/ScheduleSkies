@@ -8,6 +8,26 @@ const MapScreen = dynamic(() => import('../components/Map_Screen/Map'), {
 
 export default function MapPage() {
   const router = useRouter();
+
+  // Wait for router.query to be populated before reading params.
+  // Without this, pickMode would initially be false (query is {}) and
+  // MapScreen would render in normal mode, then re-render with pick mode
+  // once the query becomes available — causing pick mode to break.
+  if (!router.isReady) {
+    return (
+      <main className="dashboard" style={{ padding: 0, minHeight: '100vh' }}>
+        <Sidebar />
+        <div style={{
+          position: 'fixed', top: 0, left: 80, right: 0, bottom: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#f0f4f8', fontFamily: "'Segoe UI', sans-serif",
+        }}>
+          <span style={{ fontSize: '18px', color: '#4A5568' }}>⏳ Loading map…</span>
+        </div>
+      </main>
+    );
+  }
+
   const { lat, lng, label, waypoints, pick, from, returnTo } = router.query;
 
   const isPickMode = pick === '1' || pick === 'true';
