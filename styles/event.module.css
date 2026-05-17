@@ -1885,6 +1885,42 @@
   display: none;
 }
 
+.badgeContainer {
+  display: flex;
+  gap: 6px;
+  position: absolute;
+  top: 80%;
+  left: 12px;
+  right: 12px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.sharedBadge {
+  background: rgba(100, 116, 139, 0.95);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+/* Mobile styles */
+@media (max-width: 640px) {
+  .badgeContainer {
+    top: 80%;
+  }
+
+  .sharedBadge {
+    font-size: 10px;
+    padding: 4px 7px;
+    font-weight: 600;
+    display: inline-block;
+  }
+}
+
 /* --- Responsive --- */
 @media (max-width: 768px) {
   .mainContent {
@@ -2274,7 +2310,7 @@
   }
 
   .cardStatusBadge {
-    font-size: 8px;
+    font-size: 10px;
     top: 80%;
   }
 }
@@ -2283,12 +2319,14 @@
   background: #111827;
 }
 
+[data-theme='dark'] .pill,
 [data-theme='dark'] .titleGlass {
   background: rgba(30, 41, 59, 0.5);
   border-color: rgba(51, 65, 85, 0.7);
   backdrop-filter: blur(10px);
 }
 
+[data-theme='dark'] .pill,
 [data-theme='dark'] .titleGlass h1,
 [data-theme='dark'] .details h3 {
   color: #ffffff;
@@ -2299,8 +2337,13 @@
 [data-theme='dark'] .actionBtn,
 [data-theme='dark'] .eventCard,
 [data-theme='dark'] .formModal,
-[data-theme='dark'] .formGroup input, 
-[data-theme='dark'] .formGroup select, 
+[data-theme='dark'] .formHeader, [data-theme='dark'] .formHeader h2,
+[data-theme='dark'] .formGroup input, [data-theme='dark'] .formGroup label, [data-theme='dark'] .formGroup input::placeholder,
+[data-theme='dark'] .formGroup textarea::placeholder,
+[data-theme='dark'] .formGroup select,
+[data-theme='dark'] .activityFormCard, [data-theme='dark'] .activityFormCard h4, [data-theme='dark'] .activityFormCard label, [data-theme='dark'] .activityFormCard input, [data-theme='dark'] .activityFormCard textarea,
+[data-theme='dark'] .activityFormCard input::placeholder,
+[data-theme='dark'] .activityFormCard textarea::placeholder,
 [data-theme='dark'] .titleContainer,
 [data-theme='dark'] .itineraryBody,
 [data-theme='dark'] .itineraryHeaderContent,
@@ -2317,9 +2360,9 @@
   border-color: #334155;
 }
 
-[data-theme='dark'] .pill,
 [data-theme='dark'] .details p {
-  color: #a0aec0;
+  background-color: #ffffff59;
+  color: #f1f5f9;
 }
 
 [data-theme="dark"] .eventListItem {
@@ -2332,7 +2375,7 @@
   border-color: rgba(118, 181, 217, 0.35);
 }
 
-[data-theme="dark"] .listTitle {
+[data-theme="dark"] .listTitle, [data-theme="dark"] .statusBtn {
   color: #f1f5f9;
 }
 
@@ -2452,8 +2495,8 @@
   }
 
   .cardStatusBadge {
-    font-size: 10px;
-    padding: 2px 7px;
+    font-size: 8px;
+    padding: 5px 7px;
   }
 
   .listActions {

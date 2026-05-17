@@ -156,6 +156,17 @@ export default function EventGalleryHeader({ event, userId, onCoverChange, onClo
     const ext = file.name.split('.').pop()
     const path = `${userId}/${event.id}/cover_${Date.now()}.${ext}`
 
+    const { count, error: countError } = await supabase
+      .from('event_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', event.id)
+
+    if (countError) {
+      console.error('Failed to count images:', countError)
+    } else {
+      console.log('[handleChangeCover] current image count:', count)
+    }
+
     // 1. Upload new cover to storage
     const { error: uploadError } = await supabase.storage
       .from('event-images')
@@ -190,12 +201,22 @@ export default function EventGalleryHeader({ event, userId, onCoverChange, onClo
             .from('event-images')
             .getPublicUrl(oldPath)
 
-          await supabase.from('event_images').insert({
-            event_id: event.id,
-            user_id: userId,
-            url: oldUrlData.publicUrl,
-            path: oldPath,
-          })
+          if ((count ?? 0) < 9) {
+            const { error: insertError } = await supabase.from('event_images').insert({
+              event_id: event.id,
+              user_id: userId,
+              url: oldUrlData.publicUrl,
+              path: oldPath,
+            })
+
+            if (insertError) {
+              console.error('[handleChangeCover] insert failed:', insertError)
+            } else {
+              console.log('[handleChangeCover] old cover saved to event_images')
+            }
+          } else {
+            console.log('[handleChangeCover] skipped: image limit (10) reached')
+          }
         }
       } catch (err) {
         console.error('Failed to preserve old cover:', err)
@@ -215,12 +236,22 @@ export default function EventGalleryHeader({ event, userId, onCoverChange, onClo
   }
 
   async function handleDelete() {
+    const DEFAULT_COVER ='https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop'
     if (!current) return
+
+     const confirmed = window.confirm(
+      'Are you sure you want to delete this item? This action cannot be undone.'
+    )
+
+    if (!confirmed) {
+      console.log('[handleDelete] user cancelled deletion')
+      return
+    }
 
     if (current.isCover) {
       // Clear cover from events table
-      await supabase.from('events').update({ image_link: null }).eq('id', event.id)
-      onCoverChange?.(null)
+      await supabase.from('events').update({ image_link: DEFAULT_COVER }).eq('id', event.id)
+      onCoverChange?.(DEFAULT_COVER)
     } else {
       // Delete from storage + table
       if (current.path) {

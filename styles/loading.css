@@ -15,19 +15,33 @@
   width: 40px;
   height: 40px;
   border: 4px solid rgba(0, 0, 0, 0.1); /* Light gray background circle */
-  border-left-color: #fa8c43;
+  border-left-color: blue;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .spinner-container p {
   margin: 0; /* Clears default paragraph margins for precise spacing */
-  font-weight: 700;
-  color: #333;
+  font-weight: 600;
+  color: #00000099;
 }
 /* The animation logic */
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
+}
+
+@media(max-width: 425px){
+  .spinner-container p {
+    font-size: 10px;
+  }
+}
+
+[data-theme="dark"] .loading-spinner {
+  border-left-color: darkblue;
+}
+
+[data-theme="dark"] .spinner-container p {
+  color: #fff;
 }

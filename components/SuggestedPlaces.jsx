@@ -249,6 +249,7 @@ export default function SuggestedPlaces({ places = [] }) {
           {loading ? (
             <div className="spinner-container">
               <div className="loading-spinner"></div>
+              <p>Fetching Suggestions...</p>
             </div>
           ) : error ? (
             <div className={styles.error_state}>

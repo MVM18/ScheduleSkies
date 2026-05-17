@@ -70,22 +70,6 @@
   font-size: 2rem;
 }
 
-.quickStats {
-  display: flex;
-  gap: 0.7rem;
-  margin-top: 0.85rem;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-items: center;
-}
-
-.quickStats span {
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.86rem;
-}
 
 .tabs {
   display: flex;
@@ -1148,6 +1132,10 @@
     grid-template-columns: 1fr;
   }
 
+  .headerTitleRow {
+    flex-direction: column;
+  }
+  
   .profileHeader {
     flex-direction: column;
     text-align: center;
@@ -1739,4 +1727,24 @@
 
 [data-theme='dark'] .draftsInfoCard {
   border-color: #475569;
+}
+
+@media(max-width: 768px) {
+  .quickStats {
+    display: flex;
+    gap: 0.7rem;
+    margin-top: 0.85rem;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .quickStats span {
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.86rem;
+    margin: auto;
+  }
 }

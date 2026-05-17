@@ -1414,7 +1414,7 @@ const MyEvents = () => {
               className={`${styles.statusBtn} ${statusFilter === status ? styles.statusBtnActive : ''}`}
               onClick={() => setStatusFilter(status)}
             >
-              {status === 'Ongoing'} {status === 'Upcoming' && '🔜'} {status === 'Done' && '✅'} {status}
+              {status === 'Ongoing'} {status === 'Upcoming'} {status === 'Done'} {status}
               <span className={styles.statusCount}>{statusCounts[status]}</span>
             </button>
           ))}
@@ -1570,6 +1570,7 @@ const MyEvents = () => {
         {loading ? (
           <div className="spinner-container">
             <div className="loading-spinner"></div>
+            <p>Loading Events...</p>
           </div>
         ) : (
           <section className={viewMode === 'grid' ? styles.eventList : styles.eventListView}>
@@ -1615,19 +1616,10 @@ const MyEvents = () => {
                       {status === 'done' ? 'Done' : 'Upcoming'}
                     </span>
 
-                    <div style={{ display: 'flex', gap: '6px', position: 'absolute', bottom: '12px', left: '12px', right: '12px', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className={styles.badgeContainer}>
                       {event.isShared && (
-                        <span style={{
-                          background: 'rgba(100, 116, 139, 0.95)',
-                          color: '#fff',
-                          padding: '4px 10px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          border: '0.5px solid rgba(255, 255, 255, 0.3)',
-                          backdropFilter: 'blur(8px)',
-                        }}>
-                          Shared with me
+                        <span className={styles.sharedBadge}>
+                          Shared
                         </span>
                       )}
                     </div>
@@ -1689,12 +1681,12 @@ const MyEvents = () => {
                             color: '#fff',
                             padding: '4px 10px',
                             borderRadius: '12px',
-                            fontSize: '11px',
+                            fontSize: '8px',
                             fontWeight: 700,
                             border: '0.5px solid rgba(255, 255, 255, 0.3)',
                             whiteSpace: 'nowrap',
                           }}>
-                            Shared with me
+                            Shared
                           </span>
                         )}
                         <span
@@ -2069,53 +2061,129 @@ const MyEvents = () => {
                 </div>
               ) : (
                 <div className={styles.timeline}>
-                  {activities.map((activity, idx) => {
-                    const isDone = !!completedActivities[activity.id];
-                    return (
-                      <div key={activity.id} className={styles.timelineItem} style={{ animationDelay: `${idx * 0.05}s` }}>
-                        <div className={styles.timelineDot} style={isDone ? { background: '#15A862', boxShadow: '0 0 0 2px #15A862' } : {}}></div>
-                        <div className={`${styles.activityCard} ${isDone ? styles.activityDone : ''}`}>
-                          <div className={styles.activityCheckRow}>
-                            <div
-                              className={`${styles.activityCheckbox} ${isDone ? styles.activityChecked : ''}`}
-                              onClick={() => toggleActivityComplete(activity.id)}
-                              title={isDone ? 'Mark as incomplete' : 'Mark as complete'}
-                            ></div>
-                            <div style={{ flex: 1 }}>
-                              <div className={styles.activityTime}>
-                                <span className={styles.timeBadge}>{formatTime(activity.start_time)}</span>
-                                <span>→</span>
-                                <span className={styles.timeBadge}>{formatTime(activity.end_time)}</span>
-                              </div>
-                              <div className={styles.activityName}>{activity.activity_name}</div>
+                    {(() => {
+                      // Group activities by date
+                      const eventStartDate = selectedEventForItinerary?.start_datetime
+                        ? new Date(selectedEventForItinerary.start_datetime)
+                        : null;
+
+                      const grouped = {};
+                      activities.forEach(activity => {
+                        const dateKey = activity.start_time
+                          ? activity.start_time.split('T')[0]
+                          : 'unknown';
+                        if (!grouped[dateKey]) grouped[dateKey] = [];
+                        grouped[dateKey].push(activity);
+                      });
+
+                      const sortedDateKeys = Object.keys(grouped).sort();
+
+                      return sortedDateKeys.map(dateKey => {
+                        const dayActivities = grouped[dateKey];
+
+                        // Calculate Day #
+                        let dayLabel = '';
+                        if (eventStartDate && dateKey !== 'unknown') {
+                          const actDate = new Date(dateKey + 'T00:00:00');
+                          const diffMs = actDate - new Date(eventStartDate.toISOString().split('T')[0] + 'T00:00:00');
+                          const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+                          const dayNum = diffDays + 1;
+                          const formattedDate = actDate.toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          });
+                          dayLabel = `${formattedDate} — Day ${dayNum}`;
+                        }
+
+                        return (
+                          <div key={dateKey}>
+                            {/* Day Divider */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              margin: '18px 0 12px',
+                            }}>
+                              <div style={{
+                                flex: 1,
+                                height: '1px',
+                                background: 'linear-gradient(to right, transparent, rgba(118, 181, 217, 0.4))',
+                              }} />
+                              <span style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: '#4396D1',
+                                background: 'rgba(67, 150, 209, 0.1)',
+                                border: '1px solid rgba(67, 150, 209, 0.25)',
+                                borderRadius: '20px',
+                                padding: '4px 12px',
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.3px',
+                              }}>
+                                {dayLabel || dateKey}
+                              </span>
+                              <div style={{
+                                flex: 1,
+                                height: '1px',
+                                background: 'linear-gradient(to left, transparent, rgba(118, 181, 217, 0.4))',
+                              }} />
                             </div>
+
+                            {/* Activities for this day */}
+                            {dayActivities.map((activity, idx) => {
+                              const isDone = !!completedActivities[activity.id];
+                              return (
+                                <div key={activity.id} className={styles.timelineItem} style={{ animationDelay: `${idx * 0.05}s` }}>
+                                  <div className={styles.timelineDot} style={isDone ? { background: '#15A862', boxShadow: '0 0 0 2px #15A862' } : {}} />
+                                  <div className={`${styles.activityCard} ${isDone ? styles.activityDone : ''}`}>
+                                    <div className={styles.activityCheckRow}>
+                                      <div
+                                        className={`${styles.activityCheckbox} ${isDone ? styles.activityChecked : ''}`}
+                                        onClick={() => toggleActivityComplete(activity.id)}
+                                        title={isDone ? 'Mark as incomplete' : 'Mark as complete'}
+                                      />
+                                      <div style={{ flex: 1 }}>
+                                        <div className={styles.activityTime}>
+                                          <span className={styles.timeBadge}>{formatTime(activity.start_time)}</span>
+                                          <span>→</span>
+                                          <span className={styles.timeBadge}>{formatTime(activity.end_time)}</span>
+                                        </div>
+                                        <div className={styles.activityName}>{activity.activity_name}</div>
+                                      </div>
+                                    </div>
+                                    {activity.description && (
+                                      <div className={styles.activityDesc}>{activity.description}</div>
+                                    )}
+                                    {activity.location && (
+                                      <div
+                                        className={styles.activityLocation}
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => {
+                                          if (activity.latitude && activity.longitude) {
+                                            router.push(`/map?lat=${activity.latitude}&lng=${activity.longitude}&label=${encodeURIComponent(activity.location)}`);
+                                          } else {
+                                            router.push(`/map?label=${encodeURIComponent(activity.location)}`);
+                                          }
+                                        }}
+                                        title="Navigate to this location"
+                                      >
+                                        📍 {activity.location} <span style={{ fontSize: '10px', opacity: 0.7 }}>→ Navigate</span>
+                                      </div>
+                                    )}
+                                    <div className={styles.activityActions}>
+                                      <button onClick={() => handleOpenActivityForm(activity)}>✎ Edit</button>
+                                      <button className={styles.deleteActBtn} onClick={() => handleDeleteActivity(activity.id)}>🗑 Delete</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                          {activity.description && (
-                            <div className={styles.activityDesc}>{activity.description}</div>
-                          )}
-                          {activity.location && (
-                            <div
-                              className={styles.activityLocation}
-                              style={{ cursor: 'pointer' }}
-                              onClick={() => {
-                                if (activity.latitude && activity.longitude) {
-                                  router.push(`/map?lat=${activity.latitude}&lng=${activity.longitude}&label=${encodeURIComponent(activity.location)}`);
-                                } else {
-                                  router.push(`/map?label=${encodeURIComponent(activity.location)}`);
-                                }
-                              }}
-                              title="Navigate to this location"
-                            >📍 {activity.location} <span style={{ fontSize: '10px', opacity: 0.7 }}>→ Navigate</span></div>
-                          )}
-                          <div className={styles.activityActions}>
-                            <button onClick={() => handleOpenActivityForm(activity)}>✎ Edit</button>
-                            <button className={styles.deleteActBtn} onClick={() => handleDeleteActivity(activity.id)}>🗑 Delete</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      });
+                    })()}
+                  </div>
               )}
 
               {/* Activity Form */}

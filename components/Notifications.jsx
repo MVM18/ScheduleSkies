@@ -127,6 +127,7 @@ export default function Notifications({ userId }) {
 {loading ? (
       <div className="spinner-container">
         <div className="loading-spinner"></div>
+        <p>Getting Notifications...</p>
       </div>
     ) : (
       <>

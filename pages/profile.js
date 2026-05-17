@@ -577,7 +577,7 @@ const ProfilePage = () => {
                   </div>
 
                   <div className={profileStyles.card}>
-                    <h3>🔐 Danger zone</h3>
+                    <h3>⚠️ Permanently Close Account</h3>
                     <div className={profileStyles.actionButtons}>
                       <button
                         type="button"

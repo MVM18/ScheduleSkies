@@ -86,6 +86,7 @@ export default function UpcomingPlans({ plans = [] }) {
       {loading ? (
         <div className="spinner-container">
           <div className="loading-spinner"></div>
+          <p>Getting plans...</p>
         </div>
       ) : eventData.length > 0 ? (
         <ul className={styles.list}>
