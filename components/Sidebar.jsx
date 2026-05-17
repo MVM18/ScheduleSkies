@@ -36,29 +36,29 @@ export default function Sidebar() {
         <ul>
           <li>
             <Link href="/dashboard">
-              <div className={`btn ${router.pathname === '/dashboard' ? styles.active : ''}`}>
-                <HomeIcon className={styles.icon} fill="currentColor" />
+              <div className={`btn ${router.pathname === '/dashboard' ? 'active' : ''}`}>
+                <HomeIcon className={"icon"} fill="currentColor" />
               </div>
             </Link>
           </li>
           <li>
             <Link href="/plan">
-              <div className={`btn ${router.pathname === '/plan' ? styles.active : ''}`}>
-                <EventsIcon className={styles.icon} fill="currentColor" />
+              <div className={`btn ${router.pathname === '/plan' ? 'active' : ''}`}>
+                <EventsIcon className={"icon"} fill="currentColor" />
               </div>
             </Link>
           </li>
           <li>
             <Link href="/map">
-              <div className={`btn ${router.pathname === '/map' ? styles.active : ''}`}>
-                <MapIcon className={styles.icon} fill="currentColor" />
+              <div className={`btn ${router.pathname === '/map' ? 'active' : ''}`}>
+                <MapIcon className={"icon"} fill="currentColor" />
               </div>
             </Link>
           </li>
           <li>
             <Link href="/profile">
-              <div className={`btn ${router.pathname === '/profile' ? styles.active : ''}`}>
-                <ProfileIcon className={styles.icon} fill="currentColor" />
+              <div className={`btn ${router.pathname === '/profile' ? 'active' : ''}`}>
+                <ProfileIcon className={"icon"} fill="currentColor" />
               </div>
             </Link>
           </li>

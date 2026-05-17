@@ -8,7 +8,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(6px);
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -738,7 +738,7 @@
 @media (max-width: 640px) {
   .budgetModal {
     max-width: 100%;
-    border-radius: 20px 20px 0 0;
+    border-radius: 20px;
     max-height: 95vh;
   }
 
@@ -762,4 +762,265 @@
   .gaugeStats {
     gap: 16px;
   }
+}
+
+[data-theme='dark'] .budgetModal {
+  background: #1e293b;
+  box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* --- Tabs --- */
+[data-theme='dark'] .budgetTabs {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .budgetTab {
+  color: #64748b;
+}
+
+[data-theme='dark'] .budgetTab:hover {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .budgetTabActive {
+  color: #10B981 !important;
+}
+
+/* --- Body --- */
+[data-theme='dark'] .budgetBody {
+  background: #0f172a;
+}
+
+/* --- Gauge --- */
+[data-theme='dark'] .gaugeContainer {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .gaugeSpent,
+[data-theme='dark'] .gaugeStatValue {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .gaugeLabel,
+[data-theme='dark'] .gaugeStatLabel {
+  color: #64748b;
+}
+
+/* --- Budget input row --- */
+[data-theme='dark'] .budgetInputRow {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .budgetInputRow label {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .budgetInputRow input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .budgetInputRow input:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+/* --- Category breakdown --- */
+[data-theme='dark'] .categoryBreakdown {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .categoryTitle,
+[data-theme='dark'] .splitTitle {
+  color: #64748b;
+}
+
+[data-theme='dark'] .categoryName {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .categoryTrack {
+  background: #0f172a;
+}
+
+[data-theme='dark'] .categoryAmount {
+  color: #e2e8f0;
+}
+
+/* --- Expense cards --- */
+[data-theme='dark'] .expenseCard {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .expenseCard:hover {
+  border-color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .expenseName,
+[data-theme='dark'] .expenseAmount {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .expenseMeta {
+  color: #64748b;
+}
+
+[data-theme='dark'] .expenseActionBtn {
+  border-color: #334155;
+  color: #94a3b8;
+  background: transparent;
+}
+
+[data-theme='dark'] .expenseActionBtn:hover {
+  background: #334155;
+}
+
+[data-theme='dark'] .deleteExpBtn {
+  border-color: #7f1d1d !important;
+  color: #f87171 !important;
+}
+
+[data-theme='dark'] .deleteExpBtn:hover {
+  background: #450a0a !important;
+}
+
+/* --- Add expense button --- */
+[data-theme='dark'] .addExpenseBtn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #10B981;
+}
+
+[data-theme='dark'] .addExpenseBtn:hover {
+  border-color: #10B981;
+  background: #0f2d1f;
+}
+
+/* --- Expense form card --- */
+[data-theme='dark'] .expenseFormCard {
+  background: #1e293b;
+  border-color: #10B981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.08);
+}
+
+[data-theme='dark'] .expenseFormCard h4 {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .expenseFormGrid label {
+  color: #64748b;
+}
+
+[data-theme='dark'] .expenseFormGrid input,
+[data-theme='dark'] .expenseFormGrid select,
+[data-theme='dark'] .expenseFormGrid textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .expenseFormGrid input:focus,
+[data-theme='dark'] .expenseFormGrid select:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+[data-theme='dark'] .expenseFormGrid input::placeholder,
+[data-theme='dark'] .expenseFormGrid textarea::placeholder {
+  color: #475569;
+}
+
+/* --- Splits tab --- */
+[data-theme='dark'] .splitSection {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .splitModeSelector {
+  background: #0f172a;
+}
+
+[data-theme='dark'] .splitModeBtn {
+  color: #64748b;
+}
+
+[data-theme='dark'] .splitModeBtnActive {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .splitParticipant {
+  border-color: #1e293b;
+}
+
+[data-theme='dark'] .splitName,
+[data-theme='dark'] .personName {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .splitAmount,
+[data-theme='dark'] .personPaid {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .splitAmountInput {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .splitAmountInput:focus {
+  border-color: #10B981;
+}
+
+/* --- Settlement cards --- */
+[data-theme='dark'] .settlementCard {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .settlementArrow {
+  color: #64748b;
+}
+
+[data-theme='dark'] .settleBtn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .settleBtn:hover {
+  background: #0f2d1f;
+  border-color: #10B981;
+  color: #10B981;
+}
+
+[data-theme='dark'] .settled {
+  background: #14532d !important;
+  border-color: #15A862 !important;
+  color: #86efac !important;
+}
+
+/* --- Per-person rows --- */
+[data-theme='dark'] .personRow {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+/* --- Empty state --- */
+[data-theme='dark'] .emptyExpenses {
+  color: #475569;
+}
+
+/* --- Category badge --- */
+[data-theme='dark'] .catBadge {
+  opacity: 0.85;
 }

@@ -8,7 +8,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(6px);
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -816,7 +816,7 @@
 @media (max-width: 640px) {
   .shareModal {
     max-width: 100%;
-    border-radius: 20px 20px 0 0;
+    border-radius: 20px;
     max-height: 95vh;
   }
 
@@ -1032,4 +1032,253 @@
   object-fit: cover;
   border-radius: 16px;
   margin-bottom: 16px;
+}
+
+[data-theme='dark'] .shareModal {
+  background: #1e293b;
+  box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='dark'] .shareBody {
+  background: #0f172a;
+}
+
+/* --- Section labels & text --- */
+[data-theme='dark'] .sectionLabel {
+  color: #94a3b8;
+}
+
+/* --- Role selector --- */
+[data-theme='dark'] .roleSelector {
+  background: #0f172a;
+}
+
+[data-theme='dark'] .roleBtn {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .roleBtnActive {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Expiry buttons --- */
+[data-theme='dark'] .expiryBtn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .expiryBtnActive {
+  background: #1e3a5f;
+  border-color: #6D7DB9;
+  color: #a5b4fc;
+}
+
+/* --- Share link box --- */
+[data-theme='dark'] .shareLinkSection {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .shareLinkBox {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .shareLinkText {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .shareLinkMeta {
+  color: #64748b;
+}
+
+/* --- Share items list --- */
+[data-theme='dark'] .shareItem {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme='dark'] .shareItem:hover {
+  border-color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .shareItemIcon {
+  background: linear-gradient(135deg, #1e3a5f, #1e293b);
+}
+
+[data-theme='dark'] .shareItemLabel {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .shareItemMeta {
+  color: #64748b;
+}
+
+/* --- Collaborator chips --- */
+[data-theme='dark'] .collaboratorChip {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+/* --- Shared page --- */
+[data-theme='dark'] .sharedPage {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+[data-theme='dark'] .sharedNav {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(51, 65, 85, 0.6);
+}
+
+[data-theme='dark'] .sharedEventCard {
+  background: #1e293b;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .sharedTimeline {
+  background: #1e293b;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .sharedTimelineHeader {
+  border-color: #334155;
+}
+
+[data-theme='dark'] .sharedTimelineTitle {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .sharedProgressContainer {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+/* --- Guest prompt --- */
+[data-theme='dark'] .guestPrompt {
+  background: #1e293b;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .guestPromptTitle {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .guestPromptSub {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .guestInput {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .guestInput:focus {
+  border-color: #6D7DB9;
+  box-shadow: 0 0 0 3px rgba(109, 125, 185, 0.2);
+}
+
+[data-theme='dark'] .guestInput::placeholder {
+  color: #475569;
+}
+
+/* --- Login gate --- */
+[data-theme='dark'] .loginGateCard {
+  background: #1e293b;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .loginGateCard h2,
+[data-theme='dark'] .loginGateCard p {
+  color: #e2e8f0;
+}
+
+/* --- Request access card --- */
+[data-theme='dark'] .requestAccessCard {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .requestAccessCard p,
+[data-theme='dark'] .requestAccessCard h3,
+[data-theme='dark'] .requestAccessCard span {
+  color: #cbd5e1;
+}
+
+/* --- Map section --- */
+[data-theme='dark'] .sharedMapContainer {
+  border-color: #334155;
+  background: #0f172a;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .sharedMapFullscreenBtn {
+  background: rgba(30, 41, 59, 0.97);
+  color: #e2e8f0;
+  border-color: #334155;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .sharedMapFullscreenBtn:hover {
+  background: #1e293b;
+}
+
+[data-theme='dark'] .sharedMapTitle {
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .sharedMapSubtitle {
+  color: #94a3b8;
+}
+
+/* --- Nav action buttons on shared page --- */
+[data-theme='dark'] .navBtnPrimary {
+  background: #1e293b;
+  color: #93c5fd;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .navBtnPrimary:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .navBtnSecondary {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(51, 65, 85, 0.7);
+}
+
+/* --- Shared nav badge --- */
+[data-theme='dark'] .sharedNavBadge {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(51, 65, 85, 0.6);
+}
+
+/* --- Error & loading states --- */
+[data-theme='dark'] .sharedError h2,
+[data-theme='dark'] .sharedError p,
+[data-theme='dark'] .sharedLoading {
+  color: #cbd5e1;
+}
+
+/* --- Empty states --- */
+[data-theme='dark'] .emptyShareState,
+[data-theme='dark'] .sharedEmptyActivities {
+  color: #475569;
+}
+
+/* --- Role badges (keep colors, just ensure contrast) --- */
+[data-theme='dark'] .roleBadgeView {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+[data-theme='dark'] .roleBadgeEdit {
+  background: #14532d;
+  color: #86efac;
 }

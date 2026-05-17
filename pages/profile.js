@@ -52,8 +52,11 @@ const ProfilePage = () => {
   const [authUserId, setAuthUserId] = useState('');
   const [sessionToken, setSessionToken] = useState('');
 
+  const [loading, setLoading] = useState(false);
   const [securityLoading, setSecurityLoading] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  
+  const [themeReady, setThemeReady] = useState(false);
 
   const showMessage = (type, value) => {
     setMessageType(type);
@@ -61,26 +64,37 @@ const ProfilePage = () => {
     setTimeout(() => setMessage(''), 5000);
   };
 
+  // Load theme preference
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setThemeMode(savedTheme);
+    } else {
+      // Fallback to the global theme already applied by _app.js
+      const bodyTheme = document.body.getAttribute('data-theme');
+      setThemeMode(bodyTheme === 'dark' ? 'dark' : 'light');
     }
+    setThemeReady(true);
   }, []);
 
+  // Apply theme to body
   useEffect(() => {
+    if (!themeReady || !themeMode) return;
     document.body.setAttribute('data-theme', themeMode);
-  }, [themeMode]);
+  }, [themeMode, themeReady]);
 
+  // Persist theme
   useEffect(() => {
+    if (!themeReady || !themeMode) return;
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-  }, [themeMode]);
+  }, [themeMode, themeReady]);
 
   const loadProfile = useCallback(async (token, { quiet = false } = {}) => {
     if (!token) return;
     if (!quiet) setProfileRefreshing(true);
     setProfileError('');
     try {
+      setLoading(true);
       const res = await fetch('/api/profile', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -97,10 +111,12 @@ const ProfilePage = () => {
       setProfileError(err.message || 'Could not load profile data.');
     } finally {
       if (!quiet) setProfileRefreshing(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    setLoading(true);
     let cancelled = false;
 
     const init = async () => {
@@ -299,7 +315,14 @@ const ProfilePage = () => {
       </Head>
       <div className={eventStyles.appContainer}>
         <Sidebar />
-        <main className={eventStyles.mainContent} style={{ padding: 0 }}>
+
+        {loading ? (
+          <div className="spinner-container" style={{height: "100vh"}}>
+              <div className="loading-spinner"></div>
+              <p>Loading Profile...</p>
+          </div>
+        ):(
+          <main className={eventStyles.mainContent} style={{ padding: 0 }}>
           <div className={eventStyles.sun} />
           <div className={`${eventStyles.cloud} ${eventStyles.cloud1}`} />
           <div className={`${eventStyles.cloud} ${eventStyles.cloud2}`} />
@@ -554,7 +577,7 @@ const ProfilePage = () => {
                   </div>
 
                   <div className={profileStyles.card}>
-                    <h3>🔐 Danger zone</h3>
+                    <h3>⚠️ Permanently Close Account</h3>
                     <div className={profileStyles.actionButtons}>
                       <button
                         type="button"
@@ -571,6 +594,9 @@ const ProfilePage = () => {
             </div>
           </div>
         </main>
+        )}
+
+        
       </div>
     </>
   );
