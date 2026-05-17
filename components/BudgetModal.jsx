@@ -44,14 +44,28 @@ const BudgetModal = ({ event, activities, onClose }) => {
     const res = await fetch(`/api/budget/manage?event_id=${event.id}`, { headers });
     if (res.ok) {
       const d = await res.json();
+      const serverTotal = d.budget?.total || 0;
+
+      // If no budget has been saved yet, use the event's price field as fallback
+      if (!serverTotal && event.price) {
+        const parsed = parseFloat(String(event.price).replace(/[^0-9.]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) {
+          d.budget = { ...d.budget, total: parsed };
+          setBudgetInput(String(parsed));
+        } else {
+          setBudgetInput(String(serverTotal || ''));
+        }
+      } else {
+        setBudgetInput(String(serverTotal || ''));
+      }
+
       setBudget(d.budget);
       setExpenses(d.expenses);
       setSplits(d.splits);
       setParticipants(d.participants);
-      setBudgetInput(String(d.budget.total || ''));
     }
     setLoading(false);
-  }, [event.id, getAuth]);
+  }, [event.id, event.price, getAuth]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

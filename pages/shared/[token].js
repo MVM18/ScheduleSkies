@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabaseClient';
@@ -6,6 +6,8 @@ import TimeKeeper from 'react-timekeeper';
 import { Clock } from 'lucide-react';
 import styles from '../../styles/share.module.css';
 import eventStyles from '../../styles/event.module.css';
+import BudgetModal from '../../components/BudgetModal';
+import SharedEventMapSection from '../../components/SharedEventMapSection';
 
 const formatTime = (dtStr) => {
   if (!dtStr) return '';
@@ -50,10 +52,28 @@ export default function SharedEventPage() {
   const [locationResults, setLocationResults] = useState([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [signedInUser, setSignedInUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [isAddingToMyEvents, setIsAddingToMyEvents] = useState(false);
   const [addToMyEventsMsg, setAddToMyEventsMsg] = useState('');
 
+  // Request edit access state
+  const [accessRequestStatus, setAccessRequestStatus] = useState(null); // null | 'pending' | 'approved' | 'denied'
+  const [isRequestingAccess, setIsRequestingAccess] = useState(false);
+  const [requestMsg, setRequestMsg] = useState('');
+
+  // Budget state
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+
+  // Embedded map focus / pick mode
+  const [mapFocus, setMapFocus] = useState(null);
+  const [mapPickMode, setMapPickMode] = useState(false);
+  const mapSectionRef = useRef(null);
+
   const isEditRole = data?.share?.role === 'edit';
+
+  const scrollToMap = useCallback(() => {
+    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   // Fetch share data
   const fetchData = useCallback(async () => {
@@ -77,10 +97,50 @@ export default function SharedEventPage() {
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setSignedInUser(data?.session?.user || null);
+      if (mounted) {
+        setSignedInUser(data?.session?.user || null);
+        setAuthChecked(true);
+      }
     });
     return () => { mounted = false; };
   }, []);
+
+  // Auto-register signed-in users as collaborators so the event appears
+  // in their "Shared with me" list on plan.js. Uses the /api/share/get
+  // response (data.share.id) and the signed-in user's id.
+  useEffect(() => {
+    if (!signedInUser || !data?.share?.id || !data?.event?.user_id) return;
+    // Don't register the owner as a collaborator on their own event
+    if (signedInUser.id === data.event.user_id) return;
+
+    const autoRegister = async () => {
+      try {
+        const { data: existing } = await supabase
+          .from('share_collaborators')
+          .select('id')
+          .eq('share_id', data.share.id)
+          .eq('user_id', signedInUser.id)
+          .maybeSingle();
+
+        if (!existing) {
+          const displayName =
+            signedInUser.user_metadata?.full_name ||
+            signedInUser.email?.split('@')[0] ||
+            'Collaborator';
+          await supabase.from('share_collaborators').insert([{
+            share_id: data.share.id,
+            user_id: signedInUser.id,
+            guest_label: displayName,
+          }]);
+        }
+        // If they're signed in, skip the guest name prompt
+        setGuestSubmitted(true);
+      } catch (err) {
+        console.error('Auto-register collaborator error:', err);
+      }
+    };
+    autoRegister();
+  }, [signedInUser, data?.share?.id, data?.event?.user_id]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !token) return;
@@ -268,51 +328,42 @@ export default function SharedEventPage() {
   };
 
   const openMapPickerForActivity = () => {
-    if (!token) return;
-    try {
-      sessionStorage.setItem(SHARED_RESTORE_STORAGE_KEY, JSON.stringify({
-        type: 'shared-activity',
-        token,
-        activityFormSnapshot: activityForm,
-        editingActivityId,
-      }));
-    } catch (e) {
-      console.error(e);
-    }
-
-    const params = new URLSearchParams({ pick: '1', from: 'shared-activity', returnTo: `/shared/${token}` });
-    if (activityForm.latitude != null && activityForm.longitude != null) {
-      params.set('lat', String(activityForm.latitude));
-      params.set('lng', String(activityForm.longitude));
-    }
-    if (activityForm.location) params.set('label', activityForm.location);
-    router.push(`/map?${params.toString()}`);
+    setMapPickMode(true);
+    scrollToMap();
   };
 
-  // Navigation
+  const handleMapPickConfirm = (pick) => {
+    setActivityForm(prev => ({
+      ...prev,
+      location: pick.label || prev.location,
+      latitude: pick.lat,
+      longitude: pick.lng,
+    }));
+    setMapPickMode(false);
+    setIsActivityFormOpen(true);
+  };
+
+  const handleMapPickCancel = () => {
+    setMapPickMode(false);
+  };
+
+  // In-page map navigation (no auth required)
   const handleNavigateToVenue = () => {
-    const ev = data?.event;
-    if (!ev) return;
-    if (ev.latitude && ev.longitude) {
-      router.push(`/map?lat=${ev.latitude}&lng=${ev.longitude}&label=${encodeURIComponent(ev.venue || ev.location || 'Venue')}`);
-    } else if (ev.location) {
-      router.push(`/map?label=${encodeURIComponent(ev.location)}`);
-    }
+    if (!data?.event) return;
+    setMapFocus({ type: 'venue' });
+    scrollToMap();
   };
 
   const handleNavigateFullItinerary = () => {
-    const ev = data?.event;
-    if (!ev) return;
-    const waypoints = [];
-    if (ev.latitude && ev.longitude) {
-      waypoints.push({ lat: parseFloat(ev.latitude), lng: parseFloat(ev.longitude), label: ev.venue || ev.location || 'Venue' });
-    }
-    activities.forEach(a => {
-      if (a.location) waypoints.push({ label: a.location, activityName: a.activity_name });
-    });
-    if (waypoints.length > 0) {
-      router.push(`/map?waypoints=${encodeURIComponent(JSON.stringify(waypoints))}`);
-    }
+    if (!data?.event) return;
+    setMapFocus({ type: 'itinerary' });
+    scrollToMap();
+  };
+
+  const handleNavigateToActivity = (activity) => {
+    if (!activity?.location && !activity?.latitude) return;
+    setMapFocus({ type: 'activity', activityId: activity.id });
+    scrollToMap();
   };
 
   const handleAddToMyEvents = async () => {
@@ -465,8 +516,37 @@ export default function SharedEventPage() {
     if (res.ok) setActivities(prev => prev.filter(a => a.id !== id));
   };
 
+  // --- Request edit access handler ---
+  const handleRequestAccess = async () => {
+    if (!data?.share?.id) return;
+    setIsRequestingAccess(true);
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      const session = (await supabase.auth.getSession())?.data?.session;
+      if (session) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      const displayName = signedInUser?.user_metadata?.full_name || signedInUser?.email?.split('@')[0] || 'A viewer';
+      const res = await fetch('/api/share/request-access', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          share_id: data.share.id,
+          requester_name: displayName,
+          message: requestMsg || null,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) setAccessRequestStatus('pending');
+      else console.error('Request access error:', json);
+    } catch (err) {
+      console.error('Request access error:', err);
+    } finally {
+      setIsRequestingAccess(false);
+    }
+  };
+
   // --- Render states ---
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className={styles.sharedPage}>
         <div className={styles.sharedLoading}>
@@ -486,6 +566,45 @@ export default function SharedEventPage() {
           <p>This link may be invalid, expired, or revoked.</p>
         </div>
       </div>
+    );
+  }
+
+  // --- LOGIN GATE: Edit links require authentication ---
+  if (isEditRole && !signedInUser) {
+    return (
+      <>
+        <Head>
+          <title>Sign in to Collaborate | ScheduleSkies</title>
+        </Head>
+        <div className={styles.sharedPage}>
+          <nav className={styles.sharedNav}>
+            <div className={styles.sharedNavBrand}>
+              <img src="/images/logo.png" alt="ScheduleSkies logo" style={{ height: '36px', width: 'auto' }} />
+              <span>ScheduleSkies</span>
+            </div>
+            <span className={styles.sharedNavBadge}>✏️ Collaborator Link</span>
+          </nav>
+          <div className={styles.sharedContent}>
+            <div className={styles.loginGateCard}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🔐</div>
+              <h2 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 800, color: '#1e293b' }}>Sign in to Collaborate</h2>
+              <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748b', lineHeight: 1.6 }}>
+                This is an <strong>edit link</strong> — you need to sign in with your ScheduleSkies account to add or modify itineraries and budgets.
+              </p>
+              <button
+                className={styles.loginGateBtn}
+                onClick={() => router.push(`/login?returnTo=${encodeURIComponent(`/shared/${token}`)}`)}
+              >
+                🚀 Sign In to Continue
+              </button>
+              <p style={{ margin: '16px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                Don't have an account?{' '}
+                <a href={`/signup?returnTo=${encodeURIComponent(`/shared/${token}`)}`} style={{ color: '#6D7DB9', fontWeight: 700, textDecoration: 'none' }}>Sign up here</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -545,9 +664,21 @@ export default function SharedEventPage() {
 
           {/* Event Card */}
           <div className={styles.sharedEventCard}>
+            {ev?.image_link && (
+              <img
+                src={ev.image_link}
+                alt={ev.title || 'Event'}
+                className={styles.sharedEventCover}
+              />
+            )}
             <div className={styles.sharedEventHeader}>
               <div className={styles.sharedEventTag}>📅 Event Itinerary · Shared by {data.ownerName}</div>
               <h1 className={styles.sharedEventTitle}>{ev?.title}</h1>
+              {ev?.category && (
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '12px' }}>
+                  {ev.category}
+                </div>
+              )}
               <div className={styles.sharedInfoGrid}>
                 {ev?.venue && (
                   <div className={styles.sharedInfoItem}>
@@ -619,10 +750,81 @@ export default function SharedEventPage() {
                 {isAddingToMyEvents ? '⏳ Adding...' : '➕ Add to My Events'}
               </button>
             )}
+            {/* Budget button for signed-in users */}
+            {signedInUser && ev && (
+              <button className={`${styles.navActionBtn} ${styles.navBtnSecondary}`} onClick={() => setIsBudgetOpen(true)}>
+                💰 Budget & Expenses
+              </button>
+            )}
           </div>
           {addToMyEventsMsg && (
             <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
               {addToMyEventsMsg}
+            </div>
+          )}
+
+          {/* Embedded map — public, no login required */}
+          <div ref={mapSectionRef}>
+            <SharedEventMapSection
+              event={ev}
+              activities={activities}
+              mapFocus={mapFocus}
+              pickMode={mapPickMode}
+              pickInitialCoords={
+                activityForm.latitude != null && activityForm.longitude != null
+                  ? { lat: activityForm.latitude, lng: activityForm.longitude }
+                  : null
+              }
+              pickHintLabel={activityForm.location || ''}
+              onPickConfirm={handleMapPickConfirm}
+              onPickCancel={handleMapPickCancel}
+            />
+          </div>
+
+          {/* Request Edit Access — shown to view-only signed-in users */}
+          {!isEditRole && signedInUser && signedInUser.id !== data?.event?.user_id && (
+            <div className={styles.requestAccessCard}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '20px' }}>✏️</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e293b' }}>Want to add activities?</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Request edit access from the event owner</div>
+                </div>
+              </div>
+              {accessRequestStatus === 'pending' ? (
+                <div style={{ padding: '10px 14px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '10px', fontSize: '13px', fontWeight: 600, color: '#92400E' }}>
+                  ⏳ Your request has been sent. Waiting for the owner to approve.
+                </div>
+              ) : accessRequestStatus === 'approved' ? (
+                <div style={{ padding: '10px 14px', background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: '10px', fontSize: '13px', fontWeight: 600, color: '#065F46' }}>
+                  ✅ Approved!{' '}
+                  <button
+                    type="button"
+                    onClick={() => fetchData()}
+                    style={{ background: 'none', border: 'none', color: '#047857', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  >
+                    Reload to start editing
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className={styles.guestInput}
+                    style={{ marginBottom: 0, flex: 1 }}
+                    placeholder="Optional message to owner..."
+                    value={requestMsg}
+                    onChange={e => setRequestMsg(e.target.value)}
+                  />
+                  <button
+                    className={styles.requestAccessBtn}
+                    onClick={handleRequestAccess}
+                    disabled={isRequestingAccess}
+                  >
+                    {isRequestingAccess ? '⏳ Sending...' : '📨 Request Edit Access'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -696,7 +898,7 @@ export default function SharedEventPage() {
                             <div
                               className={eventStyles.activityLocation}
                               style={{ cursor: 'pointer' }}
-                              onClick={() => router.push(`/map?label=${encodeURIComponent(activity.location)}`)}
+                              onClick={() => handleNavigateToActivity(activity)}
                               title="Navigate to this location"
                             >
                               📍 {activity.location} <span style={{ fontSize: '10px', opacity: 0.7 }}>→ Navigate</span>
@@ -898,6 +1100,10 @@ export default function SharedEventPage() {
           </div>
         </div>
       </div>
+      {/* Budget Modal */}
+      {isBudgetOpen && ev && (
+        <BudgetModal event={ev} activities={activities} onClose={() => setIsBudgetOpen(false)} />
+      )}
     </>
   );
 }

@@ -596,12 +596,18 @@ const MapScreen = ({
   pickInitialCoords = null,
   pickHintLabel = '',
   returnPath = '/plan',
+  embedded = false,
+  focusWaypointIndex = null,
+  onPickConfirm,
+  onPickCancel,
 }) => {
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );
-  const [showSearchPanel, setShowSearchPanel] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : true));
+  const [showSearchPanel, setShowSearchPanel] = useState(() =>
+    embedded ? true : (typeof window !== 'undefined' ? window.innerWidth <= 768 : true)
+  );
   const [showItineraryPanel, setShowItineraryPanel] = useState(true);
   const [showPlacesPanel, setShowPlacesPanel] = useState(false);
 
@@ -676,6 +682,22 @@ const MapScreen = ({
   }, [itineraryWaypoints]);
 
   useEffect(() => {
+    if (focusWaypointIndex == null || !waypointsList.length) return;
+    const idx = Math.min(Math.max(0, focusWaypointIndex), waypointsList.length - 1);
+    setCurrentWaypointIndex(idx);
+    const wp = waypointsList[idx];
+    if (wp?.lat && wp?.lng) {
+      const dest = { lat: wp.lat, lng: wp.lng, label: wp.label || wp.activityName || `Stop ${idx + 1}` };
+      setDestination(dest);
+      setDestText(dest.label);
+      setFlyTo([dest.lat, dest.lng]);
+    } else if (wp?.label) {
+      setDestText(wp.label);
+    }
+    setShowItineraryPanel(true);
+  }, [focusWaypointIndex, waypointsList]);
+
+  useEffect(() => {
     if (!pickMode || pickInitialCoords?.lat == null || pickInitialCoords?.lng == null) return;
     let cancelled = false;
     (async () => {
@@ -701,15 +723,22 @@ const MapScreen = ({
 
   const confirmPick = () => {
     if (!pickedPoint) return;
+    const pickResult = {
+      lat: pickedPoint.lat,
+      lng: pickedPoint.lng,
+      label: pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`,
+    };
+    if (onPickConfirm) {
+      onPickConfirm(pickResult);
+      return;
+    }
     try {
       const storageKey = `scheduleSkies_mapPick_${pickContext}`;
       sessionStorage.setItem(
         storageKey,
         JSON.stringify({
           context: pickContext,
-          lat: pickedPoint.lat,
-          lng: pickedPoint.lng,
-          label: pickedLabel || `${pickedPoint.lat.toFixed(5)}, ${pickedPoint.lng.toFixed(5)}`,
+          ...pickResult,
           ts: Date.now(),
         })
       );
@@ -717,7 +746,13 @@ const MapScreen = ({
     router.push(returnPath);
   };
 
-  const cancelPick = () => router.push(returnPath);
+  const cancelPick = () => {
+    if (onPickCancel) {
+      onPickCancel();
+      return;
+    }
+    router.push(returnPath);
+  };
 
   const goToNextWaypoint = () => {
     const nextIdx = currentWaypointIndex + 1;
@@ -1380,19 +1415,20 @@ const renderPlacesBottomSheet = () => (
   </AnimatePresence>
 );
 
-  const mapShellLeft = isMobile ? 0 : 80;
-  const mapShellWidth = isMobile ? '100vw' : 'calc(100vw - 80px)';
+  const mapShellLeft = embedded ? 0 : (isMobile ? 0 : 80);
+  const mapShellWidth = embedded ? '100%' : (isMobile ? '100vw' : 'calc(100vw - 80px)');
 
   return (
-    <div
+    <motion.div
+      layout={false}
       style={{
-        position: 'fixed',
-        top: 0,
+        position: embedded ? 'relative' : 'fixed',
+        top: embedded ? undefined : 0,
         left: mapShellLeft,
         width: mapShellWidth,
-        minHeight: '100vh',
-        height: '100dvh',
-        zIndex: 1,
+        minHeight: embedded ? '100%' : '100vh',
+        height: embedded ? '100%' : '100dvh',
+        zIndex: embedded ? 0 : 1,
         fontFamily: "'Segoe UI', sans-serif",
         overflow: 'hidden',
         pointerEvents: 'auto',
@@ -1428,7 +1464,7 @@ const renderPlacesBottomSheet = () => (
       ) : (
         <>
           <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', zIndex: 1002, pointerEvents: 'auto', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-            <WeatherWidget location={weatherLocation} isMobile={true} />
+            {!embedded && <WeatherWidget location={weatherLocation} isMobile={true} />}
             {trafficSummary && routeInfo && (
               <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderRadius: '25px', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', background: trafficSummary.level === 'Heavy' ? 'linear-gradient(135deg, #FF5252, #C62828)' : trafficSummary.level === 'Moderate' ? 'linear-gradient(135deg, #FFB74D, #F57F17)' : 'linear-gradient(135deg, #66BB6A, #4CAF50)', color: 'white' }}>
                 <span style={{ fontSize: '16px' }}>{trafficSummary.level === 'Heavy' ? '🔴' : trafficSummary.level === 'Moderate' ? '🟠' : '🟢'}</span>
@@ -1445,9 +1481,11 @@ const renderPlacesBottomSheet = () => (
               <button onClick={() => setShowSearchPanel(!showSearchPanel)} style={{ backgroundColor: showSearchPanel ? '#2C5282' : '#ffffff', color: showSearchPanel ? 'white' : '#2C5282', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
                 🗺️ {showSearchPanel ? 'Hide Route' : 'Show Route'}
               </button>
-              <button onClick={() => setShowPlacesPanel(!showPlacesPanel)} style={{ backgroundColor: showPlacesPanel ? '#FF9800' : '#ffffff', color: showPlacesPanel ? 'white' : '#FF9800', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
-                📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
-              </button>
+              {!embedded && (
+                <button onClick={() => setShowPlacesPanel(!showPlacesPanel)} style={{ backgroundColor: showPlacesPanel ? '#FF9800' : '#ffffff', color: showPlacesPanel ? 'white' : '#FF9800', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
+                  📍 {showPlacesPanel ? 'Hide Places' : 'Show Places'}
+                </button>
+              )}
               {waypointsList.length > 0 && (
                 <button onClick={() => setShowItineraryPanel(!showItineraryPanel)} style={{ backgroundColor: showItineraryPanel ? '#7B1FA2' : '#ffffff', color: showItineraryPanel ? 'white' : '#7B1FA2', border: 'none', borderRadius: '30px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
                   📋 {showItineraryPanel ? 'Hide Itinerary' : 'Show Itinerary'}
@@ -1785,7 +1823,7 @@ const renderPlacesBottomSheet = () => (
   )}
 </AnimatePresence>
 
-          {!pickMode && renderPlacesBottomSheet()}
+          {!pickMode && !embedded && renderPlacesBottomSheet()}
 
           {!pickMode && waypointsList.length > 0 && showItineraryPanel && (
             <div style={{ position: 'absolute', bottom: '80px', right: '10px', left: '10px', zIndex: 1002, pointerEvents: 'auto', background: '#EDE7F6', borderRadius: '18px', padding: '12px', boxShadow: '0 4px 18px rgba(0,0,0,0.13)', maxHeight: '40%', overflowY: 'auto' }}>
@@ -1809,12 +1847,12 @@ const renderPlacesBottomSheet = () => (
         </>
       )}
 
-      {isLoadingPlaces && (
-        <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', zIndex: 1002 }}>
+      {isLoadingPlaces && !embedded && (
+        <motion.div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', zIndex: 1002 }}>
           Finding places near you...
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
