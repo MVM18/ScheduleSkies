@@ -462,7 +462,7 @@
 
 /* Header with improved styling */
 .profileHeader {
-   background: linear-gradient(120deg, rgba(150, 132, 132, 0.86), rgba(90, 91, 93, 0.9)), url('/images/fort.avif') no-repeat center center/cover;
+  background: linear-gradient(120deg, rgba(37, 99, 235, 0.86), rgba(46, 80, 133, 0.9)), url('/images/fort.avif') no-repeat center center/cover;
   background-attachment: fixed;
   min-height: 300px;
   padding: 3rem;
@@ -1285,7 +1285,7 @@
 }
 
 [data-theme='dark'] .profileHeader {
-  background: linear-gradient(120deg, rgba(150, 132, 132, 0.86), rgba(90, 91, 93, 0.9)), url('/images/fort.avif') no-repeat center center/cover;
+  background: linear-gradient(120deg, rgba(20, 50, 150, 0.86), rgba(30, 60, 100, 0.9)), url('/images/fort.avif') no-repeat center center/cover;
 }
 
 [data-theme='dark'] .card {

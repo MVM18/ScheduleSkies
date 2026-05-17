@@ -858,3 +858,178 @@
     justify-content: center;
   }
 }
+
+/* --- Login Gate Card --- */
+.loginGateCard {
+  background: white;
+  border-radius: 24px;
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+  max-width: 460px;
+  margin: 60px auto 0;
+  animation: modalSlideUp 0.35s ease;
+}
+
+.loginGateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #4A90D9, #6D7DB9);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(74, 144, 217, 0.35);
+}
+
+.loginGateBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74, 144, 217, 0.45);
+}
+
+/* --- Request Access Card --- */
+.requestAccessCard {
+  background: white;
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+  animation: fadeSlideUp 0.3s ease;
+}
+
+.requestAccessBtn {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #F59E0B, #F97316);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.requestAccessBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.requestAccessBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Embedded map on shared page --- */
+.sharedMapSection {
+  margin-bottom: 24px;
+  animation: fadeSlideUp 0.35s ease;
+}
+
+.sharedMapSectionHeader {
+  margin-bottom: 12px;
+}
+
+.sharedMapTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.sharedMapSubtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.sharedMapContainer {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  height: min(52vh, 420px);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  background: #f1f5f9;
+  transition: border-radius 0.25s ease, box-shadow 0.25s ease;
+}
+
+.sharedMapContainerFullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: none !important;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.sharedMapFullscreenBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10001;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sharedMapFullscreenBtn:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
+.sharedMapFullscreenBtn:active {
+  transform: translateY(0);
+}
+
+.sharedMapContainerFullscreen .sharedMapFullscreenBtn {
+  top: max(12px, env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+.sharedMapFullscreenIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .sharedMapContainer {
+    min-height: 380px;
+    height: 420px;
+  }
+}
+
+.sharedEventCover {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 16px;
+  margin-bottom: 16px;
+}

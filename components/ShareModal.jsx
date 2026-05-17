@@ -11,6 +11,8 @@ const ShareModal = ({ event, onClose }) => {
   const [existingShares, setExistingShares] = useState([]);
   const [isLoadingShares, setIsLoadingShares] = useState(true);
   const [error, setError] = useState('');
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [processingRequest, setProcessingRequest] = useState(null);
 
   const expiryOptions = [
     { label: 'Never', value: 0 },
@@ -39,6 +41,38 @@ const ShareModal = ({ event, onClose }) => {
   }, [event.id, getAuthHeader]);
 
   useEffect(() => { fetchExistingShares(); }, [fetchExistingShares]);
+
+  // Fetch access requests
+  const fetchAccessRequests = useCallback(async () => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`/api/share/request-access?event_id=${event.id}`, { headers });
+      const data = await res.json();
+      if (data.requests) setAccessRequests(data.requests);
+    } catch (e) {
+      console.error('Failed to fetch access requests:', e);
+    }
+  }, [event.id, getAuthHeader]);
+
+  useEffect(() => { fetchAccessRequests(); }, [fetchAccessRequests]);
+
+  const handleAccessRequest = async (requestId, action) => {
+    setProcessingRequest(requestId);
+    try {
+      const headers = await getAuthHeader();
+      await fetch('/api/share/request-access', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ request_id: requestId, action }),
+      });
+      setAccessRequests(prev => prev.filter(r => r.id !== requestId));
+      if (action === 'approve') await fetchExistingShares();
+    } catch (e) {
+      console.error('Failed to process request:', e);
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -115,7 +149,9 @@ const ShareModal = ({ event, onClose }) => {
               </button>
             </div>
             <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', fontWeight: 600 }}>
-              {role === 'view' ? '📖 Viewer can see the event and navigate to venue' : '✏️ Collaborator can add, edit, and delete activities'}
+              {role === 'view'
+                ? '📖 Viewers see the full itinerary and can use the embedded map to navigate — no account required'
+                : '✏️ Collaborators can add, edit, and delete activities'}
             </div>
           </div>
 
@@ -197,6 +233,43 @@ const ShareModal = ({ event, onClose }) => {
 
           {!isLoadingShares && existingShares.length === 0 && !generatedLink && (
             <div className={styles.emptyShareState}>🔗 No active links yet. Generate one above!</div>
+          )}
+
+          {/* Access Requests */}
+          {accessRequests.length > 0 && (
+            <div>
+              <div className={styles.sectionLabel} style={{ color: '#F59E0B' }}>🔔 Access Requests ({accessRequests.length})</div>
+              <div className={styles.sharesList}>
+                {accessRequests.map(req => (
+                  <div key={req.id} className={styles.shareItem} style={{ borderColor: '#FDE68A', background: '#FFFBEB' }}>
+                    <div className={styles.shareItemIcon} style={{ background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)' }}>🙋</div>
+                    <div className={styles.shareItemInfo}>
+                      <div className={styles.shareItemLabel}>{req.requester_name} wants edit access</div>
+                      <div className={styles.shareItemMeta}>
+                        {req.message && <span>“{req.message}”</span>}
+                        <span>{new Date(req.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        style={{ padding: '5px 12px', border: 'none', borderRadius: '8px', background: '#10B981', color: 'white', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleAccessRequest(req.id, 'approve')}
+                        disabled={processingRequest === req.id}
+                      >
+                        {processingRequest === req.id ? '⏳' : '✅ Approve'}
+                      </button>
+                      <button
+                        className={styles.revokeBtn}
+                        onClick={() => handleAccessRequest(req.id, 'deny')}
+                        disabled={processingRequest === req.id}
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

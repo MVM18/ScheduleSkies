@@ -214,6 +214,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -462,86 +463,163 @@
 }
 
 .calendarModal {
-  background: #181818;
+  background: #141414;
   color: #e0e0e0;
-  width: 90%;
+  width: 94%;
   max-width: 1100px;
-  height: 85vh;
-  border-radius: 12px;
+  height: 88vh;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: modalPopUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .calHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: #222;
-  border-bottom: 1px solid #333;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #1e1e1e, #181818);
+  border-bottom: 1px solid #2a2a2a;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .calHeaderLeft {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .calHeaderLeft h2 {
   margin: 0;
   font-size: 18px;
-  font-weight: 500;
+  font-weight: 600;
   color: #fff;
+  letter-spacing: -0.01em;
 }
 
 .calTodayBtn {
-  background: #333;
+  background: linear-gradient(135deg, #10B981, #059669);
   color: #fff;
   border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 6px 16px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
 }
 
-.calArrows {
+.calTodayBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.calNavBtns {
   display: flex;
-  gap: 12px;
-  color: #aaa;
-  font-weight: bold;
+  gap: 4px;
+  align-items: center;
+}
+
+.calArrowBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #252525;
+  color: #ccc;
   cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.calArrowBtn:hover {
+  background: #333;
+  color: #fff;
+  border-color: #555;
+}
+
+.calArrowLabel {
+  display: inline;
 }
 
 .calHeaderRight {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+.calViewToggle {
+  display: flex;
+  background: #252525;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.calViewBtn {
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.calViewBtn:hover {
+  color: #ccc;
+}
+
+.calViewBtnActive {
+  background: #76b5d9;
+  color: #111 !important;
+  box-shadow: 0 2px 8px rgba(118, 181, 217, 0.3);
 }
 
 .calCloseBtn {
-  background: transparent;
-  color: #fff;
-  border: none;
-  font-size: 18px;
+  background: #2a2a2a;
+  color: #999;
+  border: 1px solid #333;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 16px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
 }
 
 .calCloseBtn:hover {
   color: #ff5252;
+  background: #333;
+  border-color: #ff5252;
 }
 
 .calWeekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  padding: 12px 0;
-  background: #1e1e1e;
-  font-size: 11px;
-  font-weight: 700;
-  color: #888;
-  border-bottom: 1px solid #333;
+  padding: 10px 0;
+  background: #1a1a1a;
+  font-size: 10px;
+  font-weight: 800;
+  color: #666;
+  border-bottom: 1px solid #2a2a2a;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .calGrid {
@@ -549,7 +627,7 @@
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: 1fr;
   flex: 1;
-  background: #333;
+  background: #222;
   gap: 1px;
   overflow-y: auto;
 }
@@ -557,44 +635,242 @@
 .calCell,
 .calCellEmpty {
   background: #1a1a1a;
-  padding: 8px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  transition: background 0.2s;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 80px;
 }
 
 .calCell:hover {
-  background: #242424;
+  background: #222 !important;
+}
+
+.calCellSelected {
+  background: rgba(118, 181, 217, 0.12) !important;
 }
 
 .calDayNum {
-  font-size: 13px;
-  color: #ccc;
+  font-size: 12px;
+  color: #888;
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  line-height: 1;
 }
 
 .calEventsContainer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
+  gap: 3px;
+  overflow: hidden;
+  flex: 1;
 }
 
 .calEventPill {
-  font-size: 11px;
+  font-size: 10px;
   color: #111;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.3;
 }
 
 .calEventPill:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+  transform: translateX(1px);
+}
+
+.calPillDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.calMoreLabel {
+  font-size: 10px;
+  color: #76b5d9;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+/* --- Calendar Detail Panel --- */
+.calDetailPanel {
+  background: #1e1e1e;
+  border-top: 1px solid #333;
+  max-height: 220px;
+  overflow-y: auto;
+  animation: calDetailSlideUp 0.25s ease;
+}
+
+@keyframes calDetailSlideUp {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 220px; opacity: 1; }
+}
+
+.calDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px 8px;
+  position: sticky;
+  top: 0;
+  background: #1e1e1e;
+  z-index: 2;
+}
+
+.calDetailDate {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.calDetailCount {
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.calDetailClose {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  color: #999;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.calDetailClose:hover {
+  color: #ff5252;
+  border-color: #ff5252;
+}
+
+.calDetailEmpty {
+  padding: 16px 20px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.calDetailList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 16px 14px;
+}
+
+.calDetailItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #252525;
+  border-radius: 10px;
+  border: 1px solid #333;
+  transition: all 0.15s;
+}
+
+.calDetailItem:hover {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.calDetailConflict {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.calDetailColor {
+  width: 4px;
+  height: 36px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.calDetailInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.calDetailTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #eee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calDetailMeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.calDetailMeta span {
+  font-size: 11px;
+  color: #999;
+}
+
+.calDetailCat {
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 10px !important;
+  font-weight: 600;
+}
+
+.calDetailConflictBadge {
+  color: #EF4444 !important;
+  font-weight: 600;
+}
+
+.calDetailActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.calDetailBtn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #333;
+  background: #2a2a2a;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  transition: all 0.15s;
+}
+
+.calDetailBtn:hover {
+  background: #333;
+  border-color: #555;
+  transform: translateY(-1px);
 }
 
 .viewToggle {
@@ -1087,6 +1363,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 
@@ -1861,6 +2138,7 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
+    line-clamp: 1;
     overflow: hidden;
   }
 
@@ -1875,25 +2153,109 @@
   .addActivityBtn {
     font-size: 12px;
   }
-  /* Calendar Modal */
+  /* Calendar Modal — Mobile */
   .calendarModal {
     width: 100%;
-    height: 90vh;
-    border-radius: 16px 16px 0 0;
+    height: 100vh;
+    border-radius: 0;
+    max-width: 100%;
   }
 
   .calHeader {
-    padding: 12px 16px;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+
+  .calHeaderLeft {
+    gap: 8px;
   }
 
   .calHeaderLeft h2 {
     font-size: 15px;
   }
 
-  /* Background — hide on mobile */
-  .sun,
-  .cloud {
+  .calArrowLabel {
     display: none;
+  }
+
+  .calArrowBtn {
+    padding: 6px 8px;
+  }
+
+  .calTodayBtn {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+
+  .calViewToggle {
+    display: none;
+  }
+
+  .calWeekdays {
+    font-size: 9px;
+    padding: 8px 0;
+  }
+
+  .calCell,
+  .calCellEmpty {
+    padding: 4px;
+    min-height: 60px;
+  }
+
+  .calDayNum {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .calEventPill {
+    font-size: 9px;
+    padding: 2px 4px;
+    gap: 2px;
+  }
+
+  .calPillDot {
+    width: 4px;
+    height: 4px;
+  }
+
+  .calMoreLabel {
+    font-size: 9px;
+  }
+
+  .calDetailPanel {
+    max-height: 180px;
+  }
+
+  .calDetailHeader {
+    padding: 10px 14px 6px;
+  }
+
+  .calDetailDate {
+    font-size: 13px;
+  }
+
+  .calDetailList {
+    padding: 4px 10px 10px;
+    gap: 4px;
+  }
+
+  .calDetailItem {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .calDetailTitle {
+    font-size: 12px;
+  }
+
+  .calDetailBtn {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .calDetailActions {
+    gap: 3px;
   }
 }
 

@@ -527,3 +527,12 @@ CREATE POLICY "Users manage own expense splits"
 -- SELECT * FROM public.event_budgets LIMIT 5;
 -- SELECT * FROM public.event_expenses LIMIT 5;
 -- SELECT * FROM public.expense_splits LIMIT 5;
+
+-- ============================================================================
+-- COLLABORATION RLS FIX (Required for "Shared with me" to work)
+-- ============================================================================
+-- See SHARING_FIX_MIGRATION.sql for the full migration.
+-- Summary: adds SELECT policies to events, share_collaborators, and
+-- itinerary_activities so collaborators can actually see shared content.
+-- Also adds INSERT/UPDATE/DELETE policies for edit-role collaborators on
+-- itinerary_activities.
